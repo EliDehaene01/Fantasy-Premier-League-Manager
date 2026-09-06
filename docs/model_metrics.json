@@ -1,0 +1,37 @@
+{
+  "Naive (rolling 3/5 avg)": {
+    "mae": 1.0340000942418246,
+    "rmse": 2.1247375849917307,
+    "spearman": 0.7296756486669451,
+    "mae_played": 2.3240956072351424,
+    "beats_naive": false
+  },
+  "Poisson regression": {
+    "mae": 1.1284481316561892,
+    "rmse": 2.0579930024270983,
+    "spearman": 0.6936386469287454,
+    "mae_played": 2.1400816859463507,
+    "beats_naive": false
+  },
+  "Random Forest": {
+    "mae": 0.9967806325777845,
+    "rmse": 1.955323696295719,
+    "spearman": 0.7063604658969822,
+    "mae_played": 2.0632966561736708,
+    "beats_naive": true
+  },
+  "XGBoost": {
+    "mae": 0.9583885201623209,
+    "rmse": 1.9309443603598642,
+    "spearman": 0.7112742701138676,
+    "mae_played": 2.0275555925512356,
+    "beats_naive": true
+  },
+  "MLP (64, 32)": {
+    "mae": 1.0183554740499858,
+    "rmse": 1.9536742315958078,
+    "spearman": 0.6888732056114203,
+    "mae_played": 2.03812341199734,
+    "beats_naive": true
+  }
+}

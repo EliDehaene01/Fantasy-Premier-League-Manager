@@ -13,11 +13,12 @@
 ## Phase 1 — Core agent logic
 
 ### Data science pipeline (Stats agent)
-- [ ] EDA on the historical dataset (form, minutes, price changes, injury frequency)
-- [ ] Feature engineering (rolling form windows, fixture-adjusted expected points, per-90 normalization)
-- [ ] Time-respecting train/validation split (chronological, no random k-fold)
-- [ ] Train and compare baseline / Random Forest / XGBoost models
-- [ ] Add SHAP explainability, wire top-feature explanations into the Stats agent's argument
+- [x] EDA on the historical dataset (form, minutes, price changes, injury frequency) — `agents/stats/eda.py` → `docs/eda_summary.md`
+- [x] Feature engineering (the 4 required: rolling form, fixture-adjusted xP, per-90, price momentum; + 20 justified extras + position one-hots) — `agents/stats/features.py`
+- [x] Time-respecting train/validation split (chronological GW6-29 train / GW30-38 validate, no random k-fold)
+- [x] Train and compare five approaches: naive baseline, Poisson regression, Random Forest, XGBoost, small MLP — XGBoost wins (val MAE 0.958 vs naive 1.034); see `docs/model_comparison.md`
+- [x] Add SHAP explainability on the winner (`models/stats_model.pkl`), dead-weight features called out in the write-up
+- [x] Stats agent FastAPI service (`agents/stats/service.py`): `POST /argue`, model loaded once at startup, per-pick SHAP factors grounding the `reasoning` text, Foundry `gpt-5.4-nano` for the prose (deterministic fallback if the call fails), tests in `agents/stats/test_stats_agent.py`. Shared specialist-agent contract documented in `ARCHITECTURE.md` §2.
 
 ### RAG pipeline (Injuries agent)
 - [ ] Source a corpus of injury/team-news text (scrape or API)

@@ -33,6 +33,30 @@ Note the maintainer stopped posting weekly updates after the 2024-25 season, mov
 
 Note on injuries: rather than folding availability into the Stats agent as one more feature, it gets its own agent because it can act as a **veto** — a great expected-points prediction is irrelevant if the player has a 25% chance of playing. The Manager agent treats the Injuries agent's flags as hard constraints on player selection, not just another vote in the debate.
 
+### Specialist agent output contract
+
+Every specialist agent is a small FastAPI service exposing **`POST /argue`**. It takes the current player pool (player ids + the fields that agent needs) and the gameweek number, and returns this exact JSON shape:
+
+```json
+{
+  "agent": "stats",
+  "recommendations": [
+    {"player_id": 351, "conviction": 1.0, "predicted_points": 6.4}
+  ],
+  "reasoning": "Salah is the strongest pick: rising minutes over the last 3 gameweeks and a higher season points-per-game are both pushing the model toward him ..."
+}
+```
+
+- `agent` — the agent's name (`stats`, `fixtures`, `injuries`, `contrarian`, `template`, `chips`).
+- `recommendations` — the players this agent is pushing for, **sorted by `conviction` descending**. May be empty (e.g. nobody clears the bar, or an empty pool).
+- `conviction` — a **relative** push in `[0.0, 1.0]`: how hard this agent argues for this player *versus its own other picks*. **Not a probability and not a confidence score.** The strongest pick is `1.0` and the rest scale down; two different agents each returning `1.0` for their own top pick is expected.
+- `predicted_points` — this agent's point estimate for the player that gameweek. For rule-based agents (fixtures, contrarian, template) it is that agent's score expressed on a points-like scale.
+- `reasoning` — 2–4 sentences of natural language for the debate transcript.
+
+**All six specialist agents MUST return this shape** so the Manager can aggregate them uniformly (it builds its objective function from `predicted_points` weighted by `conviction`, per §2 "Manager agent"). The field names were not changed while implementing the Stats agent — `predicted_points` and `conviction` already matched the Manager's description here.
+
+One known edge, not yet resolved: the **Chips agent** reasons about chip *timing*, not players. It will likely return an empty `recommendations` list with its call in `reasoning`, or the contract will gain an optional `chip` field when that agent is built — to be decided then, and flagged here if the shared shape changes.
+
 ### Manager agent (decision)
 
 - Collects the specialists' arguments and turns them into an objective function (predicted points, weighted by conviction and adjusted for availability risk).
@@ -47,7 +71,7 @@ This is the project's most rigorous artifact and stands on its own as a data sci
 1. **EDA** on the historical archive — distributions of form, minutes, price changes, injury frequency by position.
 2. **Feature engineering** — rolling form windows, fixture-adjusted expected points, per-90 normalization, price-change momentum.
 3. **Time-respecting validation** — splits must follow chronological order (train on early gameweeks, validate on later ones); a random k-fold would leak future information, the same no-lookahead principle that governs the backtest engine.
-4. **Model comparison** — baseline (linear) vs. Random Forest vs. XGBoost, compared on held-out future gameweeks.
+4. **Model comparison** — five genuinely different approaches, not three tree variants: a naive baseline (rolling average of the player's last 3-5 gameweeks), Poisson/regularized linear regression (points are non-negative count data, not a Gaussian target — Poisson is the statistically appropriate fit), Random Forest, XGBoost, and a small MLP. The naive baseline matters most: if the ML models can't beat it, that's the headline finding, not a footnote. The MLP is expected to lose to the tree ensembles on a dataset this size — tree models reliably outperform neural nets on small structured/tabular data — and showing that result with a plausible explanation is a stronger data science narrative than omitting the comparison.
 5. **SHAP** — feature attributions for the model's top picks, which the Stats agent quotes directly in its argument during the debate ("pushing for him because his xG and minutes-per-90 are both trending up").
 
 ## 4. RAG pipeline (Injuries agent)

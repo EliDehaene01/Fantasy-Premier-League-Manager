@@ -1,0 +1,23 @@
+# Stats agent dependencies.
+# Pinned to the versions this was built and validated against
+# (Python 3.11+; developed on 3.14).
+
+# --- data-science pipeline (eda.py, features.py, train.py) ---
+numpy==2.5.2
+pandas==3.0.5
+scipy==1.18.1
+scikit-learn==1.9.0
+xgboost==3.4.1
+shap==0.52.0
+matplotlib==3.11.1
+joblib==1.6.0
+
+# --- FastAPI service (service.py, model_runtime.py, reasoning.py) ---
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+openai==3.8.0             # OpenAI-compatible client for the Microsoft Foundry endpoint
+python-dotenv==1.2.3
+
+# --- tests ---
+pytest==9.1.1
+httpx==0.28.1             # required by fastapi.testclient
