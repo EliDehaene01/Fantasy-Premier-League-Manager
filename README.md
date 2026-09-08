@@ -2,7 +2,7 @@
 
 A multi-agent AI system that manages a real Fantasy Premier League (FPL) squad. A set of specialist agents — orchestrated as a **LangGraph** state machine, each running as its own containerized service — debate transfers, captaincy and chip strategy every gameweek, weighing form, fixtures, injuries, ownership and squad rules before a manager agent finalizes a recommendation for a human to approve.
 
-This is a portfolio project built to demonstrate practical skills with agentic AI frameworks, distributed systems, and production deployment (Docker + Kubernetes) — not just a single LLM calling tools in a loop.
+This project is built to demonstrate practical skills with agentic AI frameworks, distributed systems, and production deployment (Docker + Kubernetes) — not just a single LLM calling tools in a loop.
 
 ## What it does
 
