@@ -1,0 +1,10 @@
+# Ingestion pipeline dependencies (bronze/silver FPL API ingestion).
+# Backed by Postgres (see db.py); DATABASE_URL in .env.
+
+requests==2.34.2
+pandas==3.0.5
+psycopg2-binary==2.9.13
+python-dotenv==1.2.3
+
+# --- tests ---
+pytest==9.1.1

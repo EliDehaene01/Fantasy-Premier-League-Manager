@@ -111,6 +111,10 @@ class StatsModel:
         self.model = bundle["model"]
         self.features: list[str] = list(bundle["features"])
         self.model_name: str = bundle.get("model_name", type(self.model).__name__)
+        # Tags every logged prediction (see predictions_log.py) so a retrain
+        # can never get silently blended into the same rolling error number
+        # as the model it replaced - see train.py::_model_version.
+        self.model_version: str = bundle.get("model_version", "unknown")
 
         # Unwrap a sklearn Pipeline so SHAP sees the bare estimator; keep the
         # preprocessing step so we can transform inputs the same way.

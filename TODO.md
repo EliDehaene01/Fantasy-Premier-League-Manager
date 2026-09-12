@@ -7,18 +7,29 @@
 - [ ] Create a Microsoft Foundry project (via ai.azure.com or the Azure Portal) in a resource group
 - [ ] Deploy the model(s) each agent will call (consider Foundry's Model Router for cost/quality balancing across the simpler specialist agents vs. the Manager's synthesis step); note endpoint + key
 - [ ] Enable Content Safety / Prompt Shields on the Foundry project (needed later in Phase 6, but easiest to turn on now alongside the rest of the resource setup)
-- [ ] Decide on and set up the shared data store (Postgres) for normalized data, LangGraph checkpoints, and transcripts
+- [x] Decide on and set up the shared data store (Postgres) for normalized data, LangGraph checkpoints, and transcripts (local Postgres instance running, `DATABASE_URL` in `.env`, `ingestion/db.py` connects to it — the silver layer now lives there; LangGraph checkpointer/transcript tables are still TBD, that's Phase 3 scope)
 - [ ] Local dev environment: Python env, Docker, a local Kubernetes cluster (kind or minikube) for testing manifests before any real cluster
 
 ## Phase 1 — Core agent logic
 
 ### Data science pipeline (Stats agent)
-- [x] EDA on the historical dataset (form, minutes, price changes, injury frequency) — `agents/stats/eda.py` → `docs/eda_summary.md`
-- [x] Feature engineering (the 4 required: rolling form, fixture-adjusted xP, per-90, price momentum; + 20 justified extras + position one-hots) — `agents/stats/features.py`
-- [x] Time-respecting train/validation split (chronological GW6-29 train / GW30-38 validate, no random k-fold)
-- [x] Train and compare five approaches: naive baseline, Poisson regression, Random Forest, XGBoost, small MLP — XGBoost wins (val MAE 0.958 vs naive 1.034); see `docs/model_comparison.md`
-- [x] Add SHAP explainability on the winner (`models/stats_model.pkl`), dead-weight features called out in the write-up
-- [x] Stats agent FastAPI service (`agents/stats/service.py`): `POST /argue`, model loaded once at startup, per-pick SHAP factors grounding the `reasoning` text, Foundry `gpt-5.4-nano` for the prose (deterministic fallback if the call fails), tests in `agents/stats/test_stats_agent.py`. Shared specialist-agent contract documented in `ARCHITECTURE.md` §2.
+- [ ] EDA on the historical dataset (form, minutes, price changes, injury frequency)
+- [ ] Feature engineering (rolling form windows, fixture-adjusted expected points, per-90 normalization)
+- [ ] Time-respecting train/validation split (chronological, no random k-fold)
+- [ ] Train and compare five approaches: naive rolling-average baseline, Poisson/regularized linear regression, Random Forest, XGBoost, and a small MLP
+- [ ] Add SHAP explainability, wire top-feature explanations into the Stats agent's argument
+- [ ] Handle cold-start explicitly (early season, thin rolling-window history) in the feature engineering module
+
+### Model lifecycle (training -> serving -> monitoring -> retraining)
+- [x] Refactor feature engineering into one shared module imported by both the training script and the live Stats agent, to eliminate train/serve skew (`features/engineering.py`; cold-start handling for <3-GW players added alongside it)
+- [x] Add hyperparameter tuning (e.g. Optuna) for the winning model, using the same chronological split as before -- no random k-fold here either (`agents/stats/tune.py`; Optuna TPE, forward-chaining folds inside the training pool only. First pass optimized MAE and picked a model that regressed RMSE ~9.6% -- corrected to optimize RMSE directly with a selection rule requiring both RMSE and Spearman not to regress; the re-tuned model deployed now is only marginally different from the untuned one, honestly reported as such rather than oversold -- see docs/model_comparison.md's "Hyperparameter tuning" section)
+- [x] Build the weekly ingestion pipeline against the official FPL API, layered bronze (raw JSON per endpoint) -> silver (normalized: players, teams, gameweeks, fixtures, player_gameweek_stats, my_team_state) -> gold (feature-ready, via the shared feature module); covers bootstrap-static, fixtures, event/{gw}/live, element-summary/{id}, and entry/{id} + its sub-endpoints for our own squad/bank/transfer state (`ingestion/`; Postgres via `DATABASE_URL` — migrated off the sqlite stand-in once a local instance existed)
+- [x] Backfill silver from gameweek 1 of the current season (available via the API since the season's in progress); do not attempt to backfill last season this way -- the API only has season-level totals for completed seasons, not gameweek granularity (`ingestion/backfill.py`)
+- [x] Build a schema-reconciliation/adapter step mapping the vaastav archive's columns onto the self-built silver schema, so future retraining can combine both sources consistently (`data/reconcile_archive.py`)
+- [x] Build a predictions log: every live prediction (player, gameweek, predicted points) gets stored for later comparison against actual results (`agents/stats/predictions_log.py`, wired into `/argue`; tagged with `model_version` so a retrain never blends old/new predictions - see docs/monitoring.md)
+- [x] Build the monitoring job: after each gameweek's results are final, join predictions log against actuals, compute a rolling error metric (`agents/stats/monitor.py`; RMSE, not MAE - matches tune.py's corrected objective; baseline read from `models/model_baseline.json`, written automatically by `train.py::save_model`)
+- [x] Define and implement a retrain trigger: rolling error past threshold -> rerun training on the accumulated dataset -> redeploy the new model artifact (`agents/stats/retrain.py`; fires automatically from monitor.py after 2 consecutive degraded runs, actually re-fits + re-tunes + redeploys, not a stub; season-aware combined archive+current-season dataset - required a small season-aware extension to features/engineering.py, verified backward-compatible)
+- [ ] Re-run the full five-model comparison at natural checkpoints (e.g. season boundaries) rather than assuming XGBoost stays the best choice forever
 
 ### RAG pipeline (Injuries agent)
 - [ ] Source a corpus of injury/team-news text (scrape or API)

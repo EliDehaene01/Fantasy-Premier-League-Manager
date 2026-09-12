@@ -37,9 +37,20 @@ docs/               # dataset schemas, notebooks (EDA, model comparison, SHAP)
 
 Fill in as they're established in Phase 0/1 — placeholders below, update once real:
 - Run backtest: `TBD`
-- Run tests: `TBD`
+- Run tests: `pytest ingestion features agents/stats` (ingestion tests need a running Postgres — see below)
+- Ingestion (bronze/silver): `python -m ingestion backfill` / `python -m ingestion weekly`
 - Local multi-service dev: `docker compose up`
 - Apply k8s manifests locally: `kubectl apply -f k8s/ --context kind-fpl-agents`
+
+## Data store
+
+Postgres, local instance, connected to via `DATABASE_URL` in `.env` (not
+committed — ask the user rather than guessing credentials if it's ever
+missing). `ingestion/db.py` owns the connection helper and schema; see
+`docs/ingestion_schema.md` for the bronze/silver table layout. Ingestion
+tests run against an isolated `test_ingestion` schema on the same instance,
+truncated before each test — they never touch the `public` schema real
+ingestion writes to.
 
 ## Current phase
 

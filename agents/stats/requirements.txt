@@ -2,7 +2,7 @@
 # Pinned to the versions this was built and validated against
 # (Python 3.11+; developed on 3.14).
 
-# --- data-science pipeline (eda.py, features.py, train.py) ---
+# --- data-science pipeline (eda.py, features.py, train.py, tune.py) ---
 numpy==2.5.2
 pandas==3.0.5
 scipy==1.18.1
@@ -11,12 +11,20 @@ xgboost==3.4.1
 shap==0.52.0
 matplotlib==3.11.1
 joblib==1.6.0
+optuna==5.0.0
 
 # --- FastAPI service (service.py, model_runtime.py, reasoning.py) ---
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 openai==3.8.0             # OpenAI-compatible client for the Microsoft Foundry endpoint
 python-dotenv==1.2.3
+
+# --- model lifecycle (predictions_log.py, monitor.py, retrain.py) ---
+# These import ingestion.db/ingestion.silver directly (the Postgres store -
+# see CLAUDE.md's "Data store" section) - psycopg2-binary is pinned in
+# ingestion/requirements.txt; listed here too since this package now depends
+# on it at runtime, not just via a sibling package.
+psycopg2-binary==2.9.13
 
 # --- tests ---
 pytest==9.1.1

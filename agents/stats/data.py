@@ -12,6 +12,7 @@ file does not give us directly.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +21,22 @@ import pandas as pd
 # Repo root is three levels up from this file: agents/stats/data.py -> repo/
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RAW_CSV = REPO_ROOT / "merged_gws_2025-26.csv"
+
+_SEASON_RE = re.compile(r"(\d{4}-\d{2})")
+
+
+def _infer_season(csv_path: Path | str) -> str:
+    """Pull a season label like "2025-26" out of the CSV filename.
+
+    Used to tag rows with `season` (see features/engineering.py's INPUT
+    CONTRACT) so a retrain combining this frozen archive with the current
+    season's silver data never treats last season's GW38 as the row right
+    before this season's GW1. Falls back to a generic label if the filename
+    doesn't carry a season-shaped substring - better than crashing on an
+    unusual path, and still distinct from silver's "current" tag.
+    """
+    m = _SEASON_RE.search(str(csv_path))
+    return m.group(1) if m else "archive"
 
 # Columns that describe the *outcome* of a match. They are only known AFTER
 # kick-off, so a model predicting a gameweek's points must never read them
@@ -120,6 +137,7 @@ def load_gameweeks(csv_path: Path | str = RAW_CSV) -> pd.DataFrame:
     # value (price) is stored as an integer 10x the on-screen price (40 == 4.0).
     collapsed["price"] = collapsed["value"] / 10.0
 
+    collapsed["season"] = _infer_season(csv_path)
     return collapsed.sort_values(["name", "GW"]).reset_index(drop=True)
 
 

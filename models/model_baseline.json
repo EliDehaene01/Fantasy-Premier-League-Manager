@@ -1,0 +1,18 @@
+{
+  "model_version": "1f43693b9eb1",
+  "model_name": "XGBoost (tuned)",
+  "created_utc": "2026-09-12T15:09:30.791781+00:00",
+  "holdout_metrics": {
+    "mae": 0.9764,
+    "rmse": 1.9298,
+    "spearman": 0.7117,
+    "mae_played_only": 2.022,
+    "beats_naive": true
+  },
+  "split": {
+    "warmup_last_gw": 5,
+    "train_gws": "6-29",
+    "valid_gws": "30-38",
+    "method": "chronological (no random k-fold)"
+  }
+}

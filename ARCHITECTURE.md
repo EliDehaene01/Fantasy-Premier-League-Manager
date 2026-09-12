@@ -33,30 +33,6 @@ Note the maintainer stopped posting weekly updates after the 2024-25 season, mov
 
 Note on injuries: rather than folding availability into the Stats agent as one more feature, it gets its own agent because it can act as a **veto** — a great expected-points prediction is irrelevant if the player has a 25% chance of playing. The Manager agent treats the Injuries agent's flags as hard constraints on player selection, not just another vote in the debate.
 
-### Specialist agent output contract
-
-Every specialist agent is a small FastAPI service exposing **`POST /argue`**. It takes the current player pool (player ids + the fields that agent needs) and the gameweek number, and returns this exact JSON shape:
-
-```json
-{
-  "agent": "stats",
-  "recommendations": [
-    {"player_id": 351, "conviction": 1.0, "predicted_points": 6.4}
-  ],
-  "reasoning": "Salah is the strongest pick: rising minutes over the last 3 gameweeks and a higher season points-per-game are both pushing the model toward him ..."
-}
-```
-
-- `agent` — the agent's name (`stats`, `fixtures`, `injuries`, `contrarian`, `template`, `chips`).
-- `recommendations` — the players this agent is pushing for, **sorted by `conviction` descending**. May be empty (e.g. nobody clears the bar, or an empty pool).
-- `conviction` — a **relative** push in `[0.0, 1.0]`: how hard this agent argues for this player *versus its own other picks*. **Not a probability and not a confidence score.** The strongest pick is `1.0` and the rest scale down; two different agents each returning `1.0` for their own top pick is expected.
-- `predicted_points` — this agent's point estimate for the player that gameweek. For rule-based agents (fixtures, contrarian, template) it is that agent's score expressed on a points-like scale.
-- `reasoning` — 2–4 sentences of natural language for the debate transcript.
-
-**All six specialist agents MUST return this shape** so the Manager can aggregate them uniformly (it builds its objective function from `predicted_points` weighted by `conviction`, per §2 "Manager agent"). The field names were not changed while implementing the Stats agent — `predicted_points` and `conviction` already matched the Manager's description here.
-
-One known edge, not yet resolved: the **Chips agent** reasons about chip *timing*, not players. It will likely return an empty `recommendations` list with its call in `reasoning`, or the contract will gain an optional `chip` field when that agent is built — to be decided then, and flagged here if the shared shape changes.
-
 ### Manager agent (decision)
 
 - Collects the specialists' arguments and turns them into an objective function (predicted points, weighted by conviction and adjusted for availability risk).
@@ -73,6 +49,37 @@ This is the project's most rigorous artifact and stands on its own as a data sci
 3. **Time-respecting validation** — splits must follow chronological order (train on early gameweeks, validate on later ones); a random k-fold would leak future information, the same no-lookahead principle that governs the backtest engine.
 4. **Model comparison** — five genuinely different approaches, not three tree variants: a naive baseline (rolling average of the player's last 3-5 gameweeks), Poisson/regularized linear regression (points are non-negative count data, not a Gaussian target — Poisson is the statistically appropriate fit), Random Forest, XGBoost, and a small MLP. The naive baseline matters most: if the ML models can't beat it, that's the headline finding, not a footnote. The MLP is expected to lose to the tree ensembles on a dataset this size — tree models reliably outperform neural nets on small structured/tabular data — and showing that result with a plausible explanation is a stronger data science narrative than omitting the comparison.
 5. **SHAP** — feature attributions for the model's top picks, which the Stats agent quotes directly in its argument during the debate ("pushing for him because his xG and minutes-per-90 are both trending up").
+
+## 3a. Model lifecycle: training, serving, monitoring, retraining
+
+Two separate data paths feed the Stats model, and keeping them consistent matters more than either one individually:
+
+- **Offline training**: the vaastav archive (last completed season), chronologically split, hyperparameter-tuned XGBoost. This is what already exists.
+- **Live serving**: the official FPL API, pulled weekly (`bootstrap-static`, `fixtures`, per-player `element-summary` history for the current season so far) — the GitHub archive cannot support this, since it's only checkpointed a few times a season, nowhere near weekly.
+
+**Shared feature engineering.** The feature-building logic (rolling windows, per-90 normalization, the 20 engineered extras, etc.) must live in one module imported by both the offline training script and the live Stats agent, not two similar-but-separately-maintained copies. Any drift between them silently breaks the model's assumptions at inference time even though nothing crashes.
+
+**Weekly ingestion.** A self-built pipeline against the official FPL API, structured in layers rather than one flat pull:
+
+- *Bronze (raw landing)*: the raw JSON response from each API call (`bootstrap-static`, `fixtures`, `event/{gw}/live`, `element-summary/{id}`, `entry/{id}` and its sub-endpoints), stored as-is with endpoint name and ingestion timestamp. This is what makes the pipeline replayable — a bug in a later transformation step means reprocessing from bronze, not having lost the original data.
+- *Silver (normalized)*: parsed into relational tables — `players`, `teams`, `gameweeks`, `fixtures`, `player_gameweek_stats` (one row per player per gameweek, the core accumulating fact table), and `my_team_state` (our own squad/bank/transfers per gameweek, from the `entry/{id}` endpoints — the one thing no third-party dataset has, since it's account-specific).
+- *Gold (feature-ready)*: the output of the shared feature engineering module, computed from silver, ready for both live scoring and training.
+
+Each week's run appends that gameweek's real results into the silver layer, which is what makes it double as both the Stats agent's live feature source and, over a season, genuinely new training data — not just a serving cache.
+
+This is a deliberate choice to build the ingestion layer in-house rather than depend on a third-party dataset (FPL-Core-Insights, considered and set aside) — it demonstrates the data engineering work directly rather than outsourcing it, and removes a dependency on someone else's pipeline staying maintained.
+
+**Backfill scope.** The FPL API has no gameweek-level granularity for completed seasons — `element-summary/{id}/history_past` gives only one row per past season (season totals), not per gameweek — so last season can't be backfilled this way; the vaastav archive remains the sole source for that and stays frozen behind the already-trained model. The *current* season, being in progress, does have real gameweek-by-gameweek data available (via `element-summary/{id}/history` or looping `event/{gw}/live` across finished gameweeks), so the ingestion pipeline backfills silver from gameweek 1 of the current season rather than starting empty.
+
+**Schema reconciliation.** The vaastav archive and the self-built silver schema won't share identical column names or shapes — they're separate designs. Once retraining combines last season's frozen archive with this season's accumulated silver data, a small mapping/adapter step is needed to reconcile the two into one consistent feature-ready shape, rather than assuming they merge cleanly.
+
+**Cold start.** Early in a season, rolling-window features (last 3-5 gameweeks) have little or no history to draw on. The shared feature module needs an explicit fallback for this (e.g. blend in prior-season rates, or widen the window) rather than producing garbage or crashing on players with thin current-season history.
+
+**Predictions log.** Every live prediction the Stats agent makes gets logged (player, gameweek, predicted points) so it can be compared against actual results once they're final.
+
+**Monitoring.** After each gameweek's results are confirmed, a job joins the predictions log against actual outcomes and computes a rolling error metric (e.g. MAE over the trailing N gameweeks), compared against the baseline established during backtesting.
+
+**Retrain trigger.** If the rolling error degrades past a defined threshold, the training pipeline re-runs on the full accumulated dataset (archived season + current season to date) and the new model artifact replaces the one the Stats agent loads. This doesn't have to mean rerunning the full five-model comparison every time — a retuned XGBoost retrain is the normal case; the full comparison is worth repeating at natural checkpoints (e.g. season boundaries) to confirm XGBoost is still the right choice as more data accumulates.
 
 ## 4. RAG pipeline (Injuries agent)
 

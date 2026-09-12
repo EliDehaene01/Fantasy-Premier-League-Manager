@@ -24,14 +24,24 @@ recommendation, and the LLM must never be able to change who we recommend.
 The model is loaded once, in the lifespan handler, and reused for every
 request - loading it (and building the SHAP explainer) per request would add
 hundreds of milliseconds for no reason.
+
+STEP 3, best-effort like step 2: every real scoring pass logs its
+predictions (predictions_log.py) so agents/stats/monitor.py can later check
+them against actual results. Set ``STATS_AGENT_DISABLE_PREDICTION_LOG=1`` to
+turn this off (the test suite does, so it never writes into the real
+Postgres store) - like the LLM step, a logging hiccup must never cost a
+live scoring response, so this is wrapped in its own try/except.
 """
 
 from __future__ import annotations
 
+import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from . import predictions_log
 from .model_runtime import StatsModel
 from .reasoning import generate_reasoning
 from .schemas import AgentArgument, ArgueRequest, Recommendation
@@ -43,13 +53,26 @@ try:  # load .env locally; harmless if python-dotenv isn't installed in prod
 except ImportError:  # pragma: no cover
     pass
 
+log = logging.getLogger("stats_agent")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Runs once at startup. Everything expensive and reusable goes here.
     app.state.model = StatsModel()
+
+    app.state.db_conn = None
+    if not os.environ.get("STATS_AGENT_DISABLE_PREDICTION_LOG"):
+        try:
+            from ingestion.db import get_connection
+
+            app.state.db_conn = get_connection()
+        except Exception:  # pragma: no cover - no DB configured/reachable
+            log.warning("predictions log disabled: could not connect to Postgres", exc_info=True)
+
     yield
-    # nothing to tear down
+    if app.state.db_conn is not None:
+        app.state.db_conn.close()
 
 
 app = FastAPI(title="FPL Stats agent", version="1.0", lifespan=lifespan)
@@ -77,6 +100,15 @@ def argue(request: ArgueRequest) -> AgentArgument:
 
     # --- step 2: the prose (LLM, best-effort, never load-bearing) ---------
     reasoning = generate_reasoning(request.gameweek, picks)
+
+    # --- step 3: the predictions log (best-effort, never load-bearing) ----
+    if app.state.db_conn is not None:
+        try:
+            predictions_log.log_predictions(
+                app.state.db_conn, request.gameweek, picks, model.model_version
+            )
+        except Exception:
+            log.warning("failed to write predictions log", exc_info=True)
 
     return AgentArgument(
         agent="stats",

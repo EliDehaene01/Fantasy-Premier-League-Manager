@@ -17,6 +17,7 @@ Pipeline order (matches the project's data-science spec):
 
 from __future__ import annotations
 
+import hashlib
 import json
 import platform
 from dataclasses import dataclass, field
@@ -58,6 +59,20 @@ WARMUP_LAST_GW = 5
 # Everything from here on is validation; everything before is training.
 VALID_FROM_GW = 30
 RANDOM_STATE = 42
+
+# Hand-picked defaults for the untuned XGBoost model below. Pulled out as a
+# named constant (rather than left inline) so tune.py can import and report
+# the exact params actually in production when tuning doesn't win - a
+# duplicated literal copy would silently drift out of sync the next time
+# these are hand-tweaked here.
+XGB_UNTUNED_PARAMS = {
+    "n_estimators": 600,
+    "learning_rate": 0.03,
+    "max_depth": 4,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "min_child_weight": 5,
+}
 
 
 @dataclass
@@ -115,8 +130,25 @@ def load_split():
 
 
 def train_all():
+    """Archive-only comparison: build features from the frozen vaastav CSV,
+    split chronologically, fit and score all 5 models. Thin wrapper kept for
+    backward compatibility (train.py's own main(), tune.py) - the actual
+    fitting/scoring logic is `fit_and_score_all`, which `retrain.py` reuses
+    with a DIFFERENT (combined archive + current-season) frame and split.
+    """
     frame, train, valid, feats, target = load_split()
+    return fit_and_score_all(frame, train, valid, feats, target)
 
+
+def fit_and_score_all(frame, train, valid, feats: list[str], target: str) -> dict:
+    """Fit and score all 5 models given an already-built chronological split.
+
+    Pulled out of `train_all()` so a caller with a DIFFERENT frame/split
+    (e.g. `retrain.py`'s combined archive + current-season dataset) can
+    reuse the exact same fitting/scoring code without re-implementing it -
+    a pure extraction, no behaviour change (verified: `train_all()` still
+    reproduces byte-identical metrics after this refactor).
+    """
     Xtr, ytr = train[feats].to_numpy(dtype=float), train[target].to_numpy(dtype=float)
     Xva, yva = valid[feats].to_numpy(dtype=float), valid[target].to_numpy(dtype=float)
     played_va = (valid["minutes"] > 0).to_numpy()
@@ -181,12 +213,7 @@ def train_all():
     # to keep it from memorising the training season.
     if HAVE_XGB:
         xgb = XGBRegressor(
-            n_estimators=600,
-            learning_rate=0.03,
-            max_depth=4,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            min_child_weight=5,
+            **XGB_UNTUNED_PARAMS,
             objective="count:poisson",
             random_state=RANDOM_STATE,
             n_jobs=-1,
@@ -264,7 +291,10 @@ def explain_winner(ctx: dict) -> dict:
     valid = ctx["valid"]
     Xva = ctx["X_valid"]
 
-    tree_like = winner.name in ("Random Forest", "XGBoost")
+    # startswith, not `in (...)`, so a tuned variant (e.g. "XGBoost (tuned)"
+    # from tune.py swapping in a re-fitted XGBRegressor) is still recognised
+    # as tree-like - it's still a bare XGBRegressor, not a Pipeline.
+    tree_like = winner.name.startswith(("Random Forest", "XGBoost"))
     sample_idx = np.random.RandomState(RANDOM_STATE).choice(
         len(Xva), size=min(2000, len(Xva)), replace=False
     )
@@ -342,24 +372,61 @@ def _comparison_chart(results, naive_mae):
     plt.close(fig)
 
 
+def _model_version(model_name: str, model, created_utc: str) -> str:
+    """Short, deterministic id for "this exact deployed model".
+
+    This is what a live prediction gets tagged with when logged
+    (agents/stats/predictions_log.py) - the whole reason it exists is so
+    that after a retrain, the monitoring job can tell a prediction made by
+    the OLD model apart from one made by the NEW model, rather than
+    blending both into one rolling error number (see docs/monitoring.md).
+    Built from the model's own hyperparameters + name + save timestamp, so
+    two different training runs of "the same" model never collide.
+    """
+    try:
+        params = model.get_params()
+    except AttributeError:
+        params = {}
+    fingerprint = json.dumps(
+        {
+            "model_name": model_name,
+            "params": {k: str(v) for k, v in sorted(params.items())},
+            "created_utc": created_utc,
+        },
+        sort_keys=True,
+    )
+    return hashlib.sha256(fingerprint.encode()).hexdigest()[:12]
+
+
 def save_model(ctx: dict, shap_out: dict) -> None:
     MODELS.mkdir(parents=True, exist_ok=True)
     winner = ctx["winner"]
+    created_utc = datetime.now(timezone.utc).isoformat()
+    model_version = _model_version(winner.name, ctx["winner_model"], created_utc)
+
+    # ctx["split_description"] lets a different caller (retrain.py, whose
+    # split isn't the fixed archive-only GW6-29/GW30-38 cut) describe its
+    # OWN split accurately; train.py's own archive-only path never sets it,
+    # so this falls back to exactly what was here before - no behaviour
+    # change for the existing regression-tested path.
+    split = ctx.get("split_description") or {
+        "warmup_last_gw": WARMUP_LAST_GW,
+        "train_gws": f"{WARMUP_LAST_GW + 1}-{VALID_FROM_GW - 1}",
+        "valid_gws": f"{VALID_FROM_GW}-38",
+        "method": "chronological (no random k-fold)",
+    }
+
     payload = {
         "model": ctx["winner_model"],
         "model_name": winner.name,
+        "model_version": model_version,
         "features": ctx["features"],
         "target": ctx["target"],
         "prediction_meaning": (
             "expected FPL total_points for a player in an upcoming gameweek, "
             "given only information available before that gameweek's deadline"
         ),
-        "split": {
-            "warmup_last_gw": WARMUP_LAST_GW,
-            "train_gws": f"{WARMUP_LAST_GW + 1}-{VALID_FROM_GW - 1}",
-            "valid_gws": f"{VALID_FROM_GW}-38",
-            "method": "chronological (no random k-fold)",
-        },
+        "split": split,
         "validation_metrics": {
             r.name: {
                 "mae": round(r.mae, 4),
@@ -371,12 +438,34 @@ def save_model(ctx: dict, shap_out: dict) -> None:
             for r in ctx["results"]
         },
         "top_features_by_shap": shap_out["importance"].head(12).to_dict("records"),
-        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "created_utc": created_utc,
         "python": platform.python_version(),
         "load_note": "joblib.load(...); model.predict expects the `features` columns in that order",
     }
     joblib.dump(payload, MODELS / "stats_model.pkl")
-    print(f"saved {MODELS / 'stats_model.pkl'}  (winner: {winner.name})")
+
+    # Single source of truth for "what does the currently-deployed model's
+    # backtest performance look like" - read by agents/stats/monitor.py both
+    # for the RMSE to compare rolling live performance against and for which
+    # model_version is currently deployed. Writing it here (the one place
+    # that actually deploys a model) means a retrain updates the baseline
+    # automatically, with no separate manual step to forget.
+    baseline = {
+        "model_version": model_version,
+        "model_name": winner.name,
+        "created_utc": created_utc,
+        "holdout_metrics": {
+            "mae": round(winner.mae, 4),
+            "rmse": round(winner.rmse, 4),
+            "spearman": round(winner.spearman, 4),
+            "mae_played_only": round(winner.mae_played, 4),
+            "beats_naive": winner.beats_naive,
+        },
+        "split": split,
+    }
+    (MODELS / "model_baseline.json").write_text(json.dumps(baseline, indent=2), encoding="utf-8")
+    print(f"saved {MODELS / 'stats_model.pkl'}  (winner: {winner.name}, version {model_version})")
+    print(f"saved {MODELS / 'model_baseline.json'}")
 
 
 def write_comparison(ctx: dict, shap_out: dict) -> None:

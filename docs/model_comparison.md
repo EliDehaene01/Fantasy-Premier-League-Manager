@@ -107,3 +107,57 @@ top contributors: `minutes_roll3` -0.57, `pts_season_avg` -0.54, `price_now` -0.
 - No explicit injury data - availability is inferred from recent minutes. The Injuries agent owns the hard veto in the full system.
 - `xP` (FPL's own expected-points column) was deliberately **excluded** from the features: it is another model's output and using it would make this partly a copy of FPL's model rather than an independent one.
 - One season of training data. Re-fit each season; consider carrying prior seasons once available.
+
+---
+
+---
+
+---
+
+---
+
+## Hyperparameter tuning (XGBoost)
+
+XGBoost won the original five-model comparison above on hand-picked defaults. This section tunes it with [Optuna](https://optuna.org/) (TPE sampler) and reports the result against that same untuned model, on the exact same held-out gameweeks.
+
+### Why the search can't use a random/shuffled CV
+
+The same reason the original train/validation split is chronological, not random (see "How the data was split" above): every row carries rolling-window features built from a player's own *past* gameweeks. A random k-fold inside the search - the default in most hyperparameter- tuning tutorials, and what Optuna's own CV integrations assume you'll supply - would let a fold's "validation" rows sit chronologically *before* rows in its own "training" fold, leaking future information into the model the search is scoring. So the objective function uses hand-built **forward-chaining (expanding-window) folds**, entirely inside the original training pool, never touching the GW30-38 holdout used for the final number.
+
+### A previous version of this search optimized the wrong metric
+
+The first tuning pass optimized **MAE** and picked the resulting model because MAE improved ~4.5%, without checking RMSE or Spearman. RMSE actually got **~9.6% worse** and Spearman dropped too - the search had found a model that's better at the boring middle of the points distribution and worse at exactly the big-haul, captaincy-deciding gameweeks RMSE is sensitive to (RMSE penalises large errors quadratically; MAE weighs every point of error the same). Since this model feeds a squad-selection solver where spotting big-haul candidates matters more than shaving error off routine rows, optimizing MAE was optimizing the wrong thing. **This run optimizes RMSE instead**, and tracks Spearman for every trial (not just the winner) specifically to catch the same failure mode recurring in the other direction.
+
+### Search setup
+
+- **Method:** Optuna, TPE sampler, 30 trials, **objective = RMSE** (previously MAE - see above).
+- **Validation:** 3 forward-chaining folds inside the GW6-29 training pool (unchanged from the previous run):
+  - fold 1: train GW6-15, validate GW16-19
+  - fold 2: train GW6-19, validate GW20-23
+  - fold 3: train GW6-23, validate GW24-27
+- **Search space:** `max_depth` [3, 8], `learning_rate` [0.01, 0.3] (log), `n_estimators` [100, 500], `subsample` [0.5, 1.0], `colsample_bytree` [0.5, 1.0], `min_child_weight` [1, 10], `reg_alpha` / `reg_lambda` [1e-8, 10] (log). `objective=count:poisson` and `random_state` held fixed, matching the untuned model.
+- **Best params found:** `{"max_depth": 3, "learning_rate": 0.07941568038249162, "n_estimators": 103, "subsample": 0.8535574693897521, "colsample_bytree": 0.711908481018534, "min_child_weight": 6, "reg_alpha": 1.8800102525729226e-06, "reg_lambda": 0.0005795227084412516}`
+- **Across-trial diagnostic:** correlation between each trial's fold RMSE and fold Spearman = **-0.671**. Small/negative - no meaningful sign that chasing RMSE dragged Spearman down across this search; the two moved together often enough not to be a systematic trade-off here.
+
+### Tuned vs. untuned (held-out gameweeks 30-38)
+
+| Model | MAE | RMSE | Spearman | MAE (played) | Beats naive? |
+|---|---|---|---|---|---|
+| XGBoost | 0.958 | 1.931 | 0.711 | 2.028 | **yes** |
+| XGBoost (tuned) | 0.976 | 1.930 | 0.712 | 2.022 | **yes** |
+
+![untuned vs tuned XGBoost RMSE](figures/xgb_tuning_rmse.png)
+
+### Selection rule
+
+The tuned model is deployed only if it beats the untuned baseline on **both** RMSE and Spearman, or is within a small explicit tolerance on one (0.5% for RMSE, 0.005 for Spearman - both set well below the size of the regression the MAE-optimized run produced) while clearly winning the other. No single-metric selection this time - that's exactly what caused the previous problem.
+
+### Verdict
+
+**tuned model beats (or matches) the untuned baseline on both RMSE and Spearman.**
+
+`models/stats_model.pkl` and `models/xgb_best_params.json` were updated to the tuned model (MAE 0.976, RMSE 1.930, Spearman 0.712).
+
+Honest read on the size of this: the margin is **razor-thin** - RMSE moved +0.06% and Spearman moved +0.000, both well within what re-running the search with a different seed would shift. This technically clears the selection bar (it does not regress either metric), but it should be read as *"roughly equivalent performance, re-tuned"*, not *"a clear win"* - the previous run's mistake was overstating a small number in one direction; the fix isn't to overstate a small number in the other.
+
+One real trade made deliberately: MAE moved from 0.958 to 0.976 (+1.9%) - worse than the untuned model. That's expected and accepted, not a regression to worry about: MAE is no longer what the search optimizes for (see "A previous version of this search optimized the wrong metric" above), so a model selected on RMSE/Spearman has no reason to also be MAE-optimal, and isn't here.

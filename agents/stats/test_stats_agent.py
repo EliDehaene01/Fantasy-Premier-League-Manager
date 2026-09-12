@@ -7,7 +7,9 @@ They cover the three things the task asks for:
 
 The LLM call is switched off (``STATS_AGENT_DISABLE_LLM=1``) so the tests are
 offline and deterministic - they exercise the templated-fallback path for
-``reasoning``, which is enough to check the contract.
+``reasoning``, which is enough to check the contract. Prediction logging is
+switched off too (``STATS_AGENT_DISABLE_PREDICTION_LOG=1``), so test runs
+never write synthetic player ids into the real Postgres predictions_log.
 """
 
 from __future__ import annotations
@@ -15,8 +17,10 @@ from __future__ import annotations
 import os
 
 # Must be set before the service module is imported, so generate_reasoning
-# never tries to reach Foundry during tests.
+# never tries to reach Foundry, and the lifespan handler never opens a real
+# Postgres connection, during tests.
 os.environ["STATS_AGENT_DISABLE_LLM"] = "1"
+os.environ["STATS_AGENT_DISABLE_PREDICTION_LOG"] = "1"
 
 import pytest
 from fastapi.testclient import TestClient
