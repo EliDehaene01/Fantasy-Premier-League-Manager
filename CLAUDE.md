@@ -17,19 +17,29 @@ Multi-agent system managing a real Fantasy Premier League squad. LangGraph orche
 ## Repo layout (target)
 
 ```
-agents/            # one subdir per specialist service (stats/, fixtures/, injuries/, contrarian/, template/, chips/, manager/)
+agents/            # one subdir per specialist service (stats/ built; fixtures/, injuries/, contrarian/, template/, chips/, manager/ still to come)
+features/          # shared feature engineering (agents/stats training + live scoring both import this - see its own docstring)
+data/              # cross-season schema reconciliation (vaastav archive columns -> silver's column shape)
 orchestrator/       # the LangGraph graph definition + Postgres checkpointer
 solver/             # PuLP/OR-Tools squad-selection service
-ingestion/          # data pulls: FPL API (live), GitHub archive (backtest)
+ingestion/          # data pulls: FPL API (live), GitHub archive (backtest); owns the Postgres schema (see "Data store" below)
 notifier/           # recommend-and-confirm delivery
+models/             # saved model artifacts: stats_model.pkl, model_baseline.json, xgb_best_params.json (all written by agents/stats/train.py|tune.py|retrain.py)
 k8s/                # manifests: namespace, CronJob, Deployments, ConfigMaps/Secrets
-docs/               # dataset schemas, notebooks (EDA, model comparison, SHAP)
+docs/               # dataset schemas, notebooks (EDA, model comparison, SHAP), ingestion/monitoring loop docs
 ```
 
 ## Conventions
 
 - Python 3.11+, type hints on public functions.
-- Formatting/linting: TBD in Phase 0 — check `pyproject.toml` once it exists rather than assuming a tool.
+- Formatting/linting: still TBD — no formatter/linter configured yet.
+- Dependencies: no root `pyproject.toml`. Each package pins its own
+  (`agents/stats/requirements.txt`, `ingestion/requirements.txt`) rather than
+  one shared manifest, because each is deployed as its own container
+  (ARCHITECTURE.md §8) and a monorepo-wide file would mix unrelated
+  services' dependencies. Shared dependencies are kept in sync by hand
+  across the two files (e.g. both pin `pandas==3.0.5`,
+  `psycopg2-binary==2.9.13`) — check both if bumping one.
 - Each specialist service is a small FastAPI app with one clear endpoint; keep them thin.
 - Tests live next to the code they test (`test_*.py`), not in a parallel tree.
 

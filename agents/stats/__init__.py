@@ -1,10 +1,18 @@
-"""Stats agent data-science pipeline.
+"""Stats agent: offline model building, live serving, and the model
+lifecycle loop that keeps it honest over a season.
 
-This package contains the *offline* model-building code for the Stats agent:
-EDA, feature engineering, a time-respecting train/validation split, a
-five-model comparison, and SHAP explainability. The trained model it
-produces (``models/stats_model.pkl``) is what the (separate) LLM-facing
-Stats agent will load and quote from during the gameweek debate.
+Three parts, see agents/stats/README.md for the full breakdown:
 
-Nothing in here talks to an LLM or the FPL API - it is pure data science.
+  * data science (``eda.py``, ``features.py``, ``train.py``, ``tune.py``) -
+    EDA, a time-respecting train/validation split, a five-model comparison,
+    hyperparameter tuning, and SHAP explainability. Produces
+    ``models/stats_model.pkl``.
+  * the FastAPI service (``service.py``, ``model_runtime.py``,
+    ``reasoning.py``, ``schemas.py``) - loads that model and answers
+    ``POST /argue`` in the gameweek debate, calling out to a Foundry LLM for
+    the prose only.
+  * the model lifecycle loop (``predictions_log.py``, ``monitor.py``,
+    ``retrain.py``) - logs every live prediction to Postgres, watches
+    rolling error against the backtest baseline, and retrains automatically
+    on sustained degradation. See docs/monitoring.md.
 """

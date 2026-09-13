@@ -1,12 +1,16 @@
 # Stats agent
 
-Two parts:
+Three parts:
 
-1. **The data-science pipeline** (`eda.py`, `features.py`, `train.py`) - offline
-   model building: EDA, feature engineering, model comparison, SHAP. Produces
-   `models/stats_model.pkl`.
+1. **The data-science pipeline** (`eda.py`, `features.py`, `train.py`,
+   `tune.py`) - offline model building: EDA, feature engineering, model
+   comparison, hyperparameter tuning, SHAP. Produces `models/stats_model.pkl`.
 2. **The FastAPI service** (`service.py`, `model_runtime.py`, `reasoning.py`) -
    loads that model and answers `POST /argue` in the gameweek debate.
+3. **The model lifecycle loop** (`predictions_log.py`, `monitor.py`,
+   `retrain.py`) - logs every live prediction, watches rolling error against
+   the backtest baseline, retrains automatically on sustained degradation.
+   Full write-up: `docs/monitoring.md`.
 
 ---
 
@@ -69,15 +73,17 @@ used by the tests and available for backtest runs).
 ### Tests
 
 ```bash
-python -m pytest agents/stats/test_stats_agent.py
+python -m pytest agents/stats/test_stats_agent.py agents/stats/test_monitor.py
 ```
+
+(`test_monitor.py` needs a running Postgres - see CLAUDE.md's "Data store" section.)
 
 ---
 
 ## The data-science pipeline
 
 This part is **just the data science** - EDA, feature engineering, model
-comparison, SHAP.
+comparison, hyperparameter tuning, SHAP.
 
 ## What it produces
 
@@ -88,6 +94,8 @@ comparison, SHAP.
 | Metrics (machine-readable) | `docs/model_metrics.json` | MAE / RMSE / Spearman per model |
 | Figures | `docs/figures/*.png` | Charts for both write-ups + the SHAP beeswarm |
 | **Trained model** | `models/stats_model.pkl` | The winning model + feature list + split definition + metrics (joblib dict) |
+| Baseline | `models/model_baseline.json` | The currently-deployed model's version + backtest RMSE - what `monitor.py` compares live performance against |
+| Tuned hyperparameters | `models/xgb_best_params.json` | Optuna's search result + selection-rule outcome (see `tune.py`) |
 
 ## How to run
 
@@ -99,6 +107,12 @@ python -m agents.stats.eda
 
 # 2. features -> chronological split -> 5 models -> SHAP -> save winner
 python -m agents.stats.train
+
+# 3. (optional) tune the winner's hyperparameters -> models/xgb_best_params.json
+python -m agents.stats.tune
+
+# 4. (after live predictions have been logged for a while) check for drift
+python -m agents.stats.monitor
 ```
 
 Run from the repo root. Input is `merged_gws_2025-26.csv` in the repo root
@@ -115,8 +129,13 @@ Run from the repo root. Input is `merged_gws_2025-26.csv` in the repo root
 | `schemas.py` | Pydantic request/response models - the shared specialist-agent contract |
 | `model_runtime.py` | Loads `stats_model.pkl` + SHAP explainer once; scores a pool, ranks it, derives conviction and per-pick SHAP factors (the "numbers") |
 | `reasoning.py` | Turns ranked picks + SHAP factors into 2-4 sentences via Foundry `gpt-5.4-nano`, with a deterministic fallback (the "prose") |
-| `service.py` | FastAPI app: `POST /argue`, `GET /health`; loads the model in the lifespan handler |
-| `test_stats_agent.py` | Contract shape, conviction ordering, empty-pool handling |
+| `service.py` | FastAPI app: `POST /argue`, `GET /health`; loads the model in the lifespan handler; logs each real prediction (see below) |
+| `test_stats_agent.py` | Contract shape, conviction ordering, top_k clamping, empty-pool handling |
+| `tune.py` | Optuna hyperparameter search for the winning model (RMSE objective, chronological folds); saves `models/xgb_best_params.json` and re-saves `stats_model.pkl` if the tuned model passes the selection rule |
+| `predictions_log.py` | Logs every real `/argue` prediction to Postgres (`predictions_log`), tagged with a `model_version` |
+| `monitor.py` | Rolling RMSE vs. the backtest baseline, over the trailing N gameweeks; fires `retrain.py` on sustained degradation |
+| `retrain.py` | Re-fits + re-tunes XGBoost on the full archive + current-season dataset; redeploys under the same selection rule as `tune.py` |
+| `test_monitor.py` | Rolling RMSE calculation, degradation-threshold logic, model-version isolation |
 
 ## Design decisions worth knowing
 
@@ -127,10 +146,19 @@ Run from the repo root. Input is `merged_gws_2025-26.csv` in the repo root
 - **`xP` is excluded from features.** It is FPL's own expected-points column;
   using it would make this a partial copy of FPL's model instead of an
   independent one.
-- **MAE is the primary metric, not RMSE.** ~61% of rows are zeros and the
-  score distribution has a long haul-shaped tail; RMSE just tracks the tail.
-  Spearman (player ordering) is reported alongside because that is what the
-  squad solver actually consumes.
+- **Two different "primary metric" contexts - not a contradiction.** The
+  original five-model comparison (`train.py`) still picks a winning model
+  *family* on lowest **MAE** - with ~61% of rows at zero and a long
+  haul-shaped tail, MAE is the more stable comparison across five very
+  different model types. But hyperparameter tuning (`tune.py`) and live
+  monitoring (`monitor.py`) deliberately optimize **RMSE** instead, once
+  XGBoost has already won that family contest: RMSE penalises large errors
+  quadratically, which is exactly what matters for spotting big-haul/
+  captaincy performances - the first tuning pass optimized MAE and shipped a
+  model that was measurably worse at exactly that (see the "Hyperparameter
+  tuning" section of `docs/model_comparison.md` for the full story). Spearman
+  (player ordering) is reported throughout because that is what the squad
+  solver actually consumes.
 - **The Poisson family is the statistically right call** for a non-negative,
   zero-inflated, count-like target - even though the tree models ultimately
   win on accuracy.
@@ -140,7 +168,8 @@ Run from the repo root. Input is `merged_gws_2025-26.csv` in the repo root
 ```python
 import joblib
 bundle = joblib.load("models/stats_model.pkl")
-model    = bundle["model"]        # a fitted sklearn / xgboost estimator
-features = bundle["features"]     # column order model.predict expects
+model    = bundle["model"]          # a fitted sklearn / xgboost estimator
+features = bundle["features"]       # column order model.predict expects
+version  = bundle["model_version"]  # tags every logged prediction - see docs/monitoring.md
 preds = model.predict(X[features])  # expected points for an upcoming gameweek
 ```

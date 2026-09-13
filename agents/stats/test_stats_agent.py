@@ -1,9 +1,11 @@
 """Tests for the Stats agent service.
 
-They cover the three things the task asks for:
+Covers:
   1. ``POST /argue`` returns the shared specialist-agent contract shape.
   2. Recommendations come back sorted by conviction (strongest first).
   3. An empty player pool is handled without crashing.
+  4. ``top_k`` larger than the pool is clamped, not an error.
+  5. ``GET /health`` reports the loaded model.
 
 The LLM call is switched off (``STATS_AGENT_DISABLE_LLM=1``) so the tests are
 offline and deterministic - they exercise the templated-fallback path for

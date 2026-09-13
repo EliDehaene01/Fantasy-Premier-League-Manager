@@ -1,7 +1,7 @@
 # Build plan
 
 ## Phase 0 — Setup
-- [ ] Repo scaffold (project structure, `pyproject.toml`/`requirements.txt`, linting, `CLAUDE.md`)
+- [ ] Repo scaffold (project structure ✅, dependency management ✅ — per-package `requirements.txt` chosen over a root `pyproject.toml`, see CLAUDE.md's Conventions section — linting still TBD, `CLAUDE.md` ✅)
 - [ ] Pull the 2025-26 (and prior season) `merged_gws.csv` files from [vaastav/Fantasy-Premier-League](https://github.com/vaastav/Fantasy-Premier-League) (sparse-checkout or fetch specific files via raw.githubusercontent.com rather than cloning the whole multi-season repo); confirm gameweek coverage is complete; document schema in `/docs`
 - [ ] Test the official FPL public API endpoints (`bootstrap-static`, `fixtures`, `entry/{team_id}`) — no registration or auth needed, it's fully public; find and note your own team's `entry_id` (visible in the URL once logged into fantasy.premierleague.com); set a descriptive `User-Agent` header and add basic caching/backoff since it's not an officially-documented developer product
 - [ ] Create a Microsoft Foundry project (via ai.azure.com or the Azure Portal) in a resource group
