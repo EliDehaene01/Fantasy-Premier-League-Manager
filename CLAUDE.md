@@ -9,7 +9,7 @@ Multi-agent system managing a real Fantasy Premier League squad. LangGraph orche
 ## Hard constraints — do not violate
 
 - **No lookahead in backtest data slicing.** Any function feeding data to an agent during backtest must only see data available before that gameweek's deadline. If you're unsure whether a column could leak future information (e.g. `xP`, next-gameweek-derived stats), flag it rather than assuming it's safe.
-- **Injuries agent output is a hard constraint on the Manager, not a vote.** The Manager must never select a player the Injuries agent has flagged as unavailable, regardless of predicted points.
+- **Only the News agent's `vetoes` are a hard constraint on the Manager — its `recommendations` are a normal vote.** The Manager must never select a player the News agent has flagged as unavailable in `vetoes`, regardless of predicted points. Its `recommendations` (notable positive coverage) get weighed like any other specialist's, not treated as authoritative.
 - **No auto-apply to the live FPL account.** The system recommends; a human approves and applies manually. Don't wire up code that writes to the real FPL account without an explicit separate task asking for it.
 - **RAG-retrieved text must pass through Prompt Shields (document-attack detection) before reaching any agent's context.** This applies to anything pulled from external injury/team-news sources.
 - **Microsoft Foundry is the model + guardrail layer only.** Don't introduce Foundry's own Agent Service as a second orchestrator — LangGraph owns the state machine.
@@ -17,29 +17,19 @@ Multi-agent system managing a real Fantasy Premier League squad. LangGraph orche
 ## Repo layout (target)
 
 ```
-agents/            # one subdir per specialist service (stats/ built; fixtures/, injuries/, contrarian/, template/, chips/, manager/ still to come)
-features/          # shared feature engineering (agents/stats training + live scoring both import this - see its own docstring)
-data/              # cross-season schema reconciliation (vaastav archive columns -> silver's column shape)
+agents/            # one subdir per specialist service (stats/, fixtures/, news/, contrarian/, template/, chips/, manager/)
 orchestrator/       # the LangGraph graph definition + Postgres checkpointer
 solver/             # PuLP/OR-Tools squad-selection service
-ingestion/          # data pulls: FPL API (live), GitHub archive (backtest); owns the Postgres schema (see "Data store" below)
+ingestion/          # data pulls: FPL API (live), GitHub archive (backtest)
 notifier/           # recommend-and-confirm delivery
-models/             # saved model artifacts: stats_model.pkl, model_baseline.json, xgb_best_params.json (all written by agents/stats/train.py|tune.py|retrain.py)
 k8s/                # manifests: namespace, CronJob, Deployments, ConfigMaps/Secrets
-docs/               # dataset schemas, notebooks (EDA, model comparison, SHAP), ingestion/monitoring loop docs
+docs/               # dataset schemas, notebooks (EDA, model comparison, SHAP)
 ```
 
 ## Conventions
 
 - Python 3.11+, type hints on public functions.
-- Formatting/linting: still TBD — no formatter/linter configured yet.
-- Dependencies: no root `pyproject.toml`. Each package pins its own
-  (`agents/stats/requirements.txt`, `ingestion/requirements.txt`) rather than
-  one shared manifest, because each is deployed as its own container
-  (ARCHITECTURE.md §8) and a monorepo-wide file would mix unrelated
-  services' dependencies. Shared dependencies are kept in sync by hand
-  across the two files (e.g. both pin `pandas==3.0.5`,
-  `psycopg2-binary==2.9.13`) — check both if bumping one.
+- Formatting/linting: TBD in Phase 0 — check `pyproject.toml` once it exists rather than assuming a tool.
 - Each specialist service is a small FastAPI app with one clear endpoint; keep them thin.
 - Tests live next to the code they test (`test_*.py`), not in a parallel tree.
 
@@ -47,20 +37,9 @@ docs/               # dataset schemas, notebooks (EDA, model comparison, SHAP), 
 
 Fill in as they're established in Phase 0/1 — placeholders below, update once real:
 - Run backtest: `TBD`
-- Run tests: `pytest ingestion features agents/stats` (ingestion tests need a running Postgres — see below)
-- Ingestion (bronze/silver): `python -m ingestion backfill` / `python -m ingestion weekly`
+- Run tests: `TBD`
 - Local multi-service dev: `docker compose up`
 - Apply k8s manifests locally: `kubectl apply -f k8s/ --context kind-fpl-agents`
-
-## Data store
-
-Postgres, local instance, connected to via `DATABASE_URL` in `.env` (not
-committed — ask the user rather than guessing credentials if it's ever
-missing). `ingestion/db.py` owns the connection helper and schema; see
-`docs/ingestion_schema.md` for the bronze/silver table layout. Ingestion
-tests run against an isolated `test_ingestion` schema on the same instance,
-truncated before each test — they never touch the `public` schema real
-ingestion writes to.
 
 ## Current phase
 

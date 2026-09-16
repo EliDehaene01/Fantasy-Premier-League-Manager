@@ -104,7 +104,7 @@ top contributors: `minutes_roll3` -0.57, `pts_season_avg` -0.54, `price_now` -0.
 
 - The model predicts an **average** outcome; FPL is won on the upside tail (captaincy, differentials), which the error metrics under-reward. And the naive baseline still out-ranks it on Spearman - the win here is calibration, not a dramatically better model.
 - The required **fixture-adjustment features carry almost no weight** (see SHAP). Either fixture difficulty matters less week-to-week than assumed, or the 5-game opponent-strength estimate is too noisy - the Fixtures agent may be the better home for that signal anyway.
-- No explicit injury data - availability is inferred from recent minutes. The Injuries agent owns the hard veto in the full system.
+- No explicit injury data - availability is inferred from recent minutes. The News agent owns the hard veto in the full system.
 - `xP` (FPL's own expected-points column) was deliberately **excluded** from the features: it is another model's output and using it would make this partly a copy of FPL's model rather than an independent one.
 - One season of training data. Re-fit each season; consider carrying prior seasons once available.
 

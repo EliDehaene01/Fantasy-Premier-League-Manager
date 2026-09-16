@@ -171,7 +171,7 @@ def run() -> None:
     # 5. "Injury frequency" (proxy)
     # ------------------------------------------------------------------
     add("## 5. Injury / unavailability frequency (proxy)\n")
-    add("This dataset has **no injury column**. In the live system the Injuries agent "
+    add("This dataset has **no injury column**. In the live system the News agent "
         "handles availability via team-news RAG. For EDA we use a behavioural proxy:\n")
     add("> A player is counted as **unavailable in gameweek N** if they played 60+ min in "
         "*both* gameweeks N-2 and N-1, then played **0 minutes** in N. That pattern - an "
@@ -200,7 +200,7 @@ def run() -> None:
         "with forwards and centre-backs carrying more knocks. The practical takeaway for "
         "the model: recent minutes and start-rate are not just 'form', they are also an "
         "**availability estimate** - and the Manager still gets a hard veto from the "
-        "Injuries agent on top of whatever this model predicts.\n")
+        "News agent on top of whatever this model predicts.\n")
 
     fig, ax = plt.subplots(figsize=(7, 4))
     ax.bar([r[0] for r in rows_by_pos], [r[3] * 100 for r in rows_by_pos], color="#b34b4b")

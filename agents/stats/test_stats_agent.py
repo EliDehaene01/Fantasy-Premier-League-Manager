@@ -66,8 +66,11 @@ def test_argue_returns_contract_shape(client, real_players):
     assert resp.status_code == 200
     body = resp.json()
 
-    # exact top-level shape
-    assert set(body) == {"agent", "recommendations", "reasoning"}
+    # exact top-level shape. `vetoes` is the shared contract's News-agent
+    # field (see agents/stats/schemas.py) - present on every AgentArgument,
+    # but Stats never populates it, so it must always come back empty here.
+    assert set(body) == {"agent", "recommendations", "reasoning", "vetoes"}
+    assert body["vetoes"] == []
     assert body["agent"] == "stats"
     assert isinstance(body["reasoning"], str) and len(body["reasoning"]) > 0
 
@@ -77,6 +80,9 @@ def test_argue_returns_contract_shape(client, real_players):
         assert set(rec) == {"player_id", "conviction", "predicted_points"}
         assert isinstance(rec["player_id"], int)
         assert 0.0 <= rec["conviction"] <= 1.0
+        # Stats always sets a real number (its model's actual output) - the
+        # field being Optional on the shared contract is for the News
+        # agent's qualitative picks, not a change to what Stats itself does.
         assert isinstance(rec["predicted_points"], (int, float))
 
     # every recommended id was actually in the request pool

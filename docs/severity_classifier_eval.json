@@ -1,0 +1,63 @@
+{
+  "created_utc": "2026-09-13T16:28:20.094880+00:00",
+  "dataset": {
+    "total": 188,
+    "train": 140,
+    "test": 48,
+    "label_distribution": {
+      "OUT": 174,
+      "DOUBT": 3,
+      "FIT": 11
+    }
+  },
+  "embedding_classifier_metrics": {
+    "per_class": {
+      "OUT": {
+        "precision": 1.0,
+        "recall": 0.977,
+        "f1": 0.989,
+        "support": 44
+      },
+      "DOUBT": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 1
+      },
+      "FIT": {
+        "precision": 0.6,
+        "recall": 1.0,
+        "f1": 0.75,
+        "support": 3
+      }
+    },
+    "accuracy": 0.958,
+    "macro_f1": 0.58
+  },
+  "zero_shot_metrics": {
+    "per_class": {
+      "OUT": {
+        "precision": 1.0,
+        "recall": 0.273,
+        "f1": 0.429,
+        "support": 44
+      },
+      "DOUBT": {
+        "precision": 0.04,
+        "recall": 1.0,
+        "f1": 0.077,
+        "support": 1
+      },
+      "FIT": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 3
+      }
+    },
+    "accuracy": 0.271,
+    "macro_f1": 0.169
+  },
+  "deploy_margin": 0.05,
+  "deploy_embedding_classifier": true
+}

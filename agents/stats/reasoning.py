@@ -99,6 +99,9 @@ def _default_client():
     ``OpenAI`` client works with ``base_url`` set to the Foundry endpoint.
     Raises if the env vars are missing - the caller turns that into a fallback.
     """
+    # Near-identical to agents/news/tier2.py's and embeddings.py's
+    # _default_client() - see embeddings.py's module docstring for why this
+    # isn't factored into a shared helper.
     from openai import OpenAI
 
     endpoint = os.environ[_ENDPOINT_ENV]

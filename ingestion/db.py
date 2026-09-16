@@ -212,6 +212,86 @@ CREATE TABLE IF NOT EXISTS retrain_log (
 );
 """
 
+# ---------------------------------------------------------------------------
+# News agent's RAG corpus (pgvector) - kept OUT of _SCHEMA above deliberately.
+# ---------------------------------------------------------------------------
+# _SCHEMA runs unconditionally on every get_connection() call across the
+# whole project (ingestion, Stats agent monitoring, tests...). The vector
+# store depends on the `pgvector` Postgres EXTENSION, which is a native
+# binary that has to be installed on the Postgres server itself - it is not
+# guaranteed to be present (e.g. a fresh local install doesn't have it by
+# default). If this table were folded into _SCHEMA, every single connection
+# anywhere in the project would start failing the moment pgvector isn't
+# installed, over one optional feature. So this is its own function,
+# called explicitly only by the News agent's own code (ingest.py,
+# retrieval.py), which is the only code that actually needs it.
+_NEWS_VECTOR_SCHEMA = """
+CREATE TABLE IF NOT EXISTS news_passages (
+    id BIGSERIAL PRIMARY KEY,
+    -- Which of the two scraped corpora this passage came from (see
+    -- ARCHITECTURE.md section 4) - kept distinguishable at retrieval time so
+    -- a caller can ask for availability-relevant passages specifically vs.
+    -- general coverage, rather than one undifferentiated pool.
+    corpus TEXT NOT NULL CHECK (corpus IN ('team_news', 'general_news')),
+    source_url TEXT NOT NULL,
+    headline TEXT,
+    published_at TEXT,
+    chunk_text TEXT NOT NULL,
+    -- text-embedding-3-small's native dimensionality.
+    embedding VECTOR(1536),
+    scraped_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_news_passages_corpus ON news_passages(corpus);
+
+-- Entity linking, done at ingestion time (not left to semantic search alone
+-- at query time - see agents/news/entity_linking.py for why common surnames
+-- make that unreliable). One passage can mention more than one player.
+CREATE TABLE IF NOT EXISTS news_passage_players (
+    passage_id BIGINT NOT NULL REFERENCES news_passages(id) ON DELETE CASCADE,
+    player_id INTEGER NOT NULL,
+    PRIMARY KEY (passage_id, player_id)
+);
+CREATE INDEX IF NOT EXISTS idx_news_passage_players_player ON news_passage_players(player_id);
+"""
+
+
+def register_pgvector_adapter(conn: Connection) -> None:
+    """Teach psycopg2 how to send/receive pgvector's ``vector`` type.
+
+    Without this, psycopg2's default adapter turns a Python list into a
+    Postgres ARRAY literal (``{1,2,3}``), not pgvector's expected
+    ``[1,2,3]`` syntax - embeddings would silently fail to compare/insert
+    correctly. Must be called once per connection that touches the
+    ``embedding`` column (``ensure_pgvector_schema`` does it automatically
+    after confirming the extension exists; call it directly on a connection
+    that already knows the extension is there, e.g. a long-lived service
+    connection, without re-running schema creation).
+    """
+    from pgvector.psycopg2 import register_vector
+
+    register_vector(conn)
+
+
+def ensure_pgvector_schema(conn: Connection) -> bool:
+    """Create the pgvector extension + the News agent's vector-backed tables,
+    if the extension is actually available on this Postgres instance.
+
+    Returns True if the schema is ready to use, False if pgvector isn't
+    installed (the CREATE EXTENSION call itself fails) - callers should
+    check this and fail with a clear, actionable message rather than a
+    cryptic "type vector does not exist" error the first time they try to
+    insert a row.
+    """
+    try:
+        conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    except Exception:
+        conn.rollback()
+        return False
+    conn.execute(_NEWS_VECTOR_SCHEMA)
+    conn.commit()
+    register_pgvector_adapter(conn)
+    return True
+
 
 def get_connection(dsn: str | None = None, *, schema: str | None = None) -> Connection:
     """Open a connection to the bronze/silver Postgres store.

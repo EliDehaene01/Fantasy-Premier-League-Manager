@@ -645,7 +645,7 @@ def write_comparison(ctx: dict, shap_out: dict) -> None:
       "opponent-strength estimate is too noisy - the Fixtures agent may be the better "
       "home for that signal anyway.")
     a("- No explicit injury data - availability is inferred from recent minutes. The "
-      "Injuries agent owns the hard veto in the full system.")
+      "News agent owns the hard veto in the full system.")
     a("- `xP` (FPL's own expected-points column) was deliberately **excluded** from the "
       "features: it is another model's output and using it would make this partly a copy "
       "of FPL's model rather than an independent one.")

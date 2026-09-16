@@ -1,0 +1,21 @@
+# News agent dependencies.
+
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+openai==3.8.0             # OpenAI-compatible client for Foundry chat completions + embeddings
+python-dotenv==1.2.3
+requests==2.34.2          # Prompt Shields REST call
+playwright==1.56.0        # fantasy.premierleague.com is a client-rendered SPA - see scraper_*.py docstrings
+psycopg2-binary==2.9.13   # ingestion.db (shared Postgres store)
+pgvector==0.4.1           # psycopg2 adapter for the `vector` column type
+
+# --- severity_classifier.py / severity_finetune_eval.py (embedding classifier) ---
+# Versions match agents/stats/requirements.txt's pins - same venv, same
+# already-installed versions, kept in sync deliberately rather than left to drift.
+numpy==2.5.2
+scikit-learn==1.9.0
+joblib==1.6.0
+
+# --- tests ---
+pytest==9.1.1
+httpx==0.28.1             # required by fastapi.testclient

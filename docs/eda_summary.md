@@ -78,7 +78,7 @@ Across all established starters, **7.2%** of gameweeks see them drop out like th
 | MID | 2,335 | 156 | 6.7% |
 | FWD | 532 | 27 | 5.1% |
 
-*Reading it:* **DEFs** drop out most often (8.8%), consistent with forwards and centre-backs carrying more knocks. The practical takeaway for the model: recent minutes and start-rate are not just 'form', they are also an **availability estimate** - and the Manager still gets a hard veto from the Injuries agent on top of whatever this model predicts.
+*Reading it:* **DEFs** drop out most often (8.8%), consistent with forwards and centre-backs carrying more knocks. The practical takeaway for the model: recent minutes and start-rate are not just 'form', they are also an **availability estimate** - and the Manager still gets a hard veto from the News agent on top of whatever this model predicts.
 
 ![injury proxy](figures/injury_proxy_by_position.png)
 
@@ -103,4 +103,4 @@ Pearson correlation of a single past-gameweek stat with the *following* gameweek
 2. **Use MAE as the primary metric, RMSE as secondary.** RMSE is hostage to a handful of 15+ point hauls.
 3. **Poisson over plain linear.** The target is skewed, zero-inflated and (mostly) non-negative count data.
 4. **Expect a modest beat over the naive baseline.** The best single stat (recent minutes) correlates ~0.5 with next-GW points; last-GW points alone ~0.4.
-5. **Availability is a feature, not just an agent concern** - but the Injuries agent still holds the hard veto.
+5. **Availability is a feature, not just an agent concern** - but the News agent still holds the hard veto.

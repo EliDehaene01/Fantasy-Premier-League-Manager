@@ -1,13 +1,13 @@
 # Build plan
 
 ## Phase 0 — Setup
-- [ ] Repo scaffold (project structure ✅, dependency management ✅ — per-package `requirements.txt` chosen over a root `pyproject.toml`, see CLAUDE.md's Conventions section — linting still TBD, `CLAUDE.md` ✅)
+- [ ] Repo scaffold (project structure, `pyproject.toml`/`requirements.txt`, linting, `CLAUDE.md`)
 - [ ] Pull the 2025-26 (and prior season) `merged_gws.csv` files from [vaastav/Fantasy-Premier-League](https://github.com/vaastav/Fantasy-Premier-League) (sparse-checkout or fetch specific files via raw.githubusercontent.com rather than cloning the whole multi-season repo); confirm gameweek coverage is complete; document schema in `/docs`
 - [ ] Test the official FPL public API endpoints (`bootstrap-static`, `fixtures`, `entry/{team_id}`) — no registration or auth needed, it's fully public; find and note your own team's `entry_id` (visible in the URL once logged into fantasy.premierleague.com); set a descriptive `User-Agent` header and add basic caching/backoff since it's not an officially-documented developer product
 - [ ] Create a Microsoft Foundry project (via ai.azure.com or the Azure Portal) in a resource group
 - [ ] Deploy the model(s) each agent will call (consider Foundry's Model Router for cost/quality balancing across the simpler specialist agents vs. the Manager's synthesis step); note endpoint + key
 - [ ] Enable Content Safety / Prompt Shields on the Foundry project (needed later in Phase 6, but easiest to turn on now alongside the rest of the resource setup)
-- [x] Decide on and set up the shared data store (Postgres) for normalized data, LangGraph checkpoints, and transcripts (local Postgres instance running, `DATABASE_URL` in `.env`, `ingestion/db.py` connects to it — the silver layer now lives there; LangGraph checkpointer/transcript tables are still TBD, that's Phase 3 scope)
+- [ ] Decide on and set up the shared data store (Postgres) for normalized data, LangGraph checkpoints, and transcripts
 - [ ] Local dev environment: Python env, Docker, a local Kubernetes cluster (kind or minikube) for testing manifests before any real cluster
 
 ## Phase 1 — Core agent logic
@@ -21,25 +21,30 @@
 - [ ] Handle cold-start explicitly (early season, thin rolling-window history) in the feature engineering module
 
 ### Model lifecycle (training -> serving -> monitoring -> retraining)
-- [x] Refactor feature engineering into one shared module imported by both the training script and the live Stats agent, to eliminate train/serve skew (`features/engineering.py`; cold-start handling for <3-GW players added alongside it)
-- [x] Add hyperparameter tuning (e.g. Optuna) for the winning model, using the same chronological split as before -- no random k-fold here either (`agents/stats/tune.py`; Optuna TPE, forward-chaining folds inside the training pool only. First pass optimized MAE and picked a model that regressed RMSE ~9.6% -- corrected to optimize RMSE directly with a selection rule requiring both RMSE and Spearman not to regress; the re-tuned model deployed now is only marginally different from the untuned one, honestly reported as such rather than oversold -- see docs/model_comparison.md's "Hyperparameter tuning" section)
-- [x] Build the weekly ingestion pipeline against the official FPL API, layered bronze (raw JSON per endpoint) -> silver (normalized: players, teams, gameweeks, fixtures, player_gameweek_stats, my_team_state) -> gold (feature-ready, via the shared feature module); covers bootstrap-static, fixtures, event/{gw}/live, element-summary/{id}, and entry/{id} + its sub-endpoints for our own squad/bank/transfer state (`ingestion/`; Postgres via `DATABASE_URL` — migrated off the sqlite stand-in once a local instance existed)
-- [x] Backfill silver from gameweek 1 of the current season (available via the API since the season's in progress); do not attempt to backfill last season this way -- the API only has season-level totals for completed seasons, not gameweek granularity (`ingestion/backfill.py`)
-- [x] Build a schema-reconciliation/adapter step mapping the vaastav archive's columns onto the self-built silver schema, so future retraining can combine both sources consistently (`data/reconcile_archive.py`)
-- [x] Build a predictions log: every live prediction (player, gameweek, predicted points) gets stored for later comparison against actual results (`agents/stats/predictions_log.py`, wired into `/argue`; tagged with `model_version` so a retrain never blends old/new predictions - see docs/monitoring.md)
-- [x] Build the monitoring job: after each gameweek's results are final, join predictions log against actuals, compute a rolling error metric (`agents/stats/monitor.py`; RMSE, not MAE - matches tune.py's corrected objective; baseline read from `models/model_baseline.json`, written automatically by `train.py::save_model`)
-- [x] Define and implement a retrain trigger: rolling error past threshold -> rerun training on the accumulated dataset -> redeploy the new model artifact (`agents/stats/retrain.py`; fires automatically from monitor.py after 2 consecutive degraded runs, actually re-fits + re-tunes + redeploys, not a stub; season-aware combined archive+current-season dataset - required a small season-aware extension to features/engineering.py, verified backward-compatible)
+- [ ] Refactor feature engineering into one shared module imported by both the training script and the live Stats agent, to eliminate train/serve skew
+- [ ] Add hyperparameter tuning (e.g. Optuna) for the winning model, using the same chronological split as before -- no random k-fold here either
+- [ ] Build the weekly ingestion pipeline against the official FPL API, layered bronze (raw JSON per endpoint) -> silver (normalized: players, teams, gameweeks, fixtures, player_gameweek_stats, my_team_state) -> gold (feature-ready, via the shared feature module); covers bootstrap-static, fixtures, event/{gw}/live, element-summary/{id}, and entry/{id} + its sub-endpoints for our own squad/bank/transfer state
+- [ ] Backfill silver from gameweek 1 of the current season (available via the API since the season's in progress); do not attempt to backfill last season this way -- the API only has season-level totals for completed seasons, not gameweek granularity
+- [ ] Build a schema-reconciliation/adapter step mapping the vaastav archive's columns onto the self-built silver schema, so future retraining can combine both sources consistently
+- [ ] Build a predictions log: every live prediction (player, gameweek, predicted points) gets stored for later comparison against actual results
+- [ ] Build the monitoring job: after each gameweek's results are final, join predictions log against actuals, compute a rolling error metric
+- [ ] Define and implement a retrain trigger: rolling error past threshold -> rerun training on the accumulated dataset -> redeploy the new model artifact
 - [ ] Re-run the full five-model comparison at natural checkpoints (e.g. season boundaries) rather than assuming XGBoost stays the best choice forever
 
-### RAG pipeline (Injuries agent)
-- [ ] Source a corpus of injury/team-news text (scrape or API)
-- [ ] Build chunking + embedding + vector store for retrieval
-- [ ] Wire retrieval into the Injuries agent's context alongside structured availability fields
+### Two-tier availability and news pipeline (News agent)
+- [x] Build Tier 1: deterministic check of `chance_of_playing_this_round` and `news` (already in silver) -- no LLM call for clear-cut cases (`agents/news/tier1.py`)
+- [x] Scrape and tag two corpora at ingestion time: the FPL site's Team News tab (availability-focused) and the general News section (form write-ups, price-change articles -- where notable positive coverage lives) (`agents/news/scraper_team_news.py`, `scraper_general_news.py`; both verified live to require Playwright -- see docs/news_agent.md for the article-body rendering caveat found during that check)
+- [x] Build entity linking: match player names/surnames in scraped text to player_id via the players silver table, at ingestion time (`agents/news/entity_linking.py`; documented ambiguous-surname rule)
+- [x] Set up pgvector on the existing Postgres instance; chunk and embed both corpora with text-embedding-3-small (`ingestion/db.py::ensure_pgvector_schema`, `agents/news/embeddings.py`, `ingest.py` -- pgvector 0.8.6 installed and live; 188 team_news + 89 general_news passages ingested with real embeddings and entity links; see docs/news_agent.md)
+- [x] Build Tier 2 retrieval: filter by entity-linking tag, rank by embedding similarity (`agents/news/retrieval.py`)
+- [x] Wire Prompt Shields document-attack detection on every retrieved passage before it reaches the agent's context (`agents/news/prompt_shields.py`; fails closed, logs every drop)
+- [x] Extend the shared agent contract: add a `vetoes` field (player_id, status OUT/DOUBT/FIT, confidence, grounding snippet); make `predicted_points` optional in `recommendations` for this agent, since qualitative buzz doesn't come with a real number (`agents/stats/schemas.py`; Stats agent's own test suite re-run and confirmed passing after the change)
+- [x] Wire Tier 2 to populate `vetoes` for ambiguous availability cases and `recommendations` for notable positive coverage -- these are different judgments feeding different contract fields, not one output (`agents/news/tier2.py`, `service.py`)
 
-### Fine-tuning (Injuries agent)
-- [ ] Label a small dataset for injury-severity/return-timeline classification
-- [ ] Fine-tune a small classifier (or embedding model) for this task
-- [ ] Evaluate against a zero-shot prompting baseline (precision/recall) and document the comparison
+### Fine-tuning (News agent)
+- [x] Label a small dataset for injury-severity/return-timeline classification -- scoped to availability only, not the positive-coverage judgment (188 real team_news passages, rule-based labeling from formulaic FPL status text; see docs/severity_classifier.md)
+- [x] Fine-tune a small classifier (or embedding model) for this task -- embedding-based (text-embedding-3-small + LogisticRegression), not a hosted fine-tune; see docs/severity_classifier.md for why
+- [x] Evaluate against a zero-shot prompting baseline (precision/recall) and document the comparison -- classifier won by a wide, real margin (macro-F1 ~0.58 vs ~0.17-0.19) and is now the deployed Tier 2 production path (`agents/news/severity_classifier.py`); see docs/severity_classifier.md
 
 ### Remaining agents
 - [ ] Write the Fixtures agent (FDR scoring, blank/double gameweek detection)
@@ -47,7 +52,7 @@
 - [ ] Write the Template agent (ownership/net-transfers logic)
 - [ ] Write the Chips agent (chip-timing logic against the fixture calendar)
 - [ ] Build the solver tool (PuLP/OR-Tools: budget, formation, per-club cap, transfer-hit cost)
-- [ ] Write the Manager agent (aggregation, hard-constraint handling from Injuries, solver call, captain/vice logic)
+- [ ] Write the Manager agent (aggregation, hard-constraint handling from the News agent's vetoes, solver call, captain/vice logic)
 
 ## Phase 2 — Backtest engine
 - [ ] Implement state tracking (squad, bank, free transfers, chips used) across gameweeks
@@ -67,7 +72,7 @@
 - [ ] Test a full backtest gameweek and a full local "live" dry run end-to-end
 
 ## Phase 4 — Containerization
-- [ ] Write a Dockerfile per specialist service (stats, fixtures, injuries, contrarian, template, chips, manager, solver, ingestion, notifier, orchestrator)
+- [ ] Write a Dockerfile per specialist service (stats, fixtures, news, contrarian, template, chips, manager, solver, ingestion, notifier, orchestrator)
 - [ ] Local `docker compose` setup to verify the orchestrator can reach every specialist service before moving to Kubernetes
 
 ## Phase 5 — Kubernetes deployment
@@ -82,9 +87,9 @@
 ## Phase 6 — Guardrails (Microsoft Foundry)
 - [ ] Enable Content Safety / Prompt Shields on the Foundry project
 - [ ] Wire user-prompt-attack detection in front of any agent that takes external/human input
-- [ ] Wire document-attack detection in front of the Injuries agent's RAG-retrieved passages specifically
+- [ ] Wire document-attack detection in front of the News agent's RAG-retrieved passages specifically
 - [ ] Test with a deliberately "poisoned" test news article to confirm indirect injection is actually caught
-- [ ] (Optional) Add groundedness detection on the Injuries agent's summaries
+- [ ] (Optional) Add groundedness detection on the News agent's summaries
 
 ## Phase 7 — Human-in-the-loop recommend & confirm
 - [ ] Design the recommendation message format (transfers, captain, chip call, short "why" summary from the debate)
