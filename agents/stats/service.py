@@ -41,17 +41,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from shared.agent_service import create_service
+from shared.contracts import AgentArgument, ArgueRequest, Recommendation
+
 from . import predictions_log
 from .model_runtime import StatsModel
 from .reasoning import generate_reasoning
-from .schemas import AgentArgument, ArgueRequest, Recommendation
-
-try:  # load .env locally; harmless if python-dotenv isn't installed in prod
-    from dotenv import load_dotenv
-
-    load_dotenv()
-except ImportError:  # pragma: no cover
-    pass
 
 log = logging.getLogger("stats_agent")
 
@@ -75,21 +70,16 @@ async def lifespan(app: FastAPI):
         app.state.db_conn.close()
 
 
-app = FastAPI(title="FPL Stats agent", version="1.0", lifespan=lifespan)
-
-
-@app.get("/health")
-def health() -> dict:
+def _health(app: FastAPI) -> dict:
     """Liveness probe for Kubernetes; also confirms which model is loaded."""
     model: StatsModel = app.state.model
     return {"status": "ok", "model": model.model_name, "n_features": len(model.features)}
 
 
-@app.post("/argue", response_model=AgentArgument)
-def argue(request: ArgueRequest) -> AgentArgument:
+def _argue(app: FastAPI, request: ArgueRequest) -> AgentArgument:
     """Score the pool, rank it, and return this agent's argument.
 
-    Returns the shared specialist-agent contract (see schemas.AgentArgument).
+    Returns the shared specialist-agent contract (see shared/contracts.py).
     An empty pool is a valid request - it just yields an empty recommendation
     list and a one-line explanation, never an error.
     """
@@ -122,3 +112,8 @@ def argue(request: ArgueRequest) -> AgentArgument:
         ],
         reasoning=reasoning,
     )
+
+
+app = create_service(
+    title="FPL Stats agent", argue_handler=_argue, health_handler=_health, lifespan=lifespan
+)

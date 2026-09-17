@@ -5,7 +5,7 @@ these are pure function calls, asserted directly.
 
 from __future__ import annotations
 
-from agents.stats.schemas import VetoStatus
+from shared.contracts import VetoStatus
 from agents.news.tier1 import check_tier1
 
 

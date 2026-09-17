@@ -21,7 +21,7 @@ structure preference, but for cost and reliability reasons:
     settle, plus the general-news scan.
 
 This module produces TWO different kinds of output from the same agent
-(see agents/stats/schemas.py's ``AgentArgument``):
+(see shared/contracts.py's ``AgentArgument``):
   * ``vetoes`` - a hard constraint. The Manager must never select a player
     flagged OUT/DOUBT here, regardless of any other agent's predicted
     points. Grounded in either a Tier 1 rule or a Tier 2 LLM read of

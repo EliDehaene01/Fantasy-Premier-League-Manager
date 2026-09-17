@@ -22,7 +22,7 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 
 from agents.stats.data import REPO_ROOT
-from agents.stats.schemas import VetoStatus
+from shared.contracts import VetoStatus
 
 from . import embeddings
 

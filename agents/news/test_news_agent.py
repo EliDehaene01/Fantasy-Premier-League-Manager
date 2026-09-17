@@ -44,8 +44,10 @@ def test_argue_returns_extended_contract_shape():
     assert resp.status_code == 200
     body = resp.json()
 
-    assert set(body) == {"agent", "recommendations", "vetoes", "reasoning"}
+    assert set(body) == {"agent", "recommendations", "vetoes", "reasoning", "chip_recommendation"}
     assert body["agent"] == "news"
+    # News never populates the Chips agent's timing field either.
+    assert body["chip_recommendation"] is None
     assert isinstance(body["reasoning"], str) and body["reasoning"]
     assert isinstance(body["recommendations"], list)
 

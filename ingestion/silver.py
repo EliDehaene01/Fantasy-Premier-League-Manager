@@ -317,6 +317,30 @@ def upsert_my_team_state(
     conn.commit()
 
 
+def upsert_chip_usage(conn: "db.Connection", chips: list) -> None:
+    """Every chip played this season, from ``entry/{id}/history/``'s
+    ``chips`` list (each ``{name, time, event}``) - see db.py's schema
+    comment on ``chip_usage`` for why this table, not
+    ``my_team_state.active_chip``, is the source of truth for "which chips
+    are still available" (agents/chips/ reads this table).
+
+    An empty/missing ``chips`` list (no chips played yet this season) is a
+    normal, valid case - nothing to upsert, not an error.
+    """
+    now = _now()
+    for chip in chips:
+        conn.execute(
+            """
+            INSERT INTO chip_usage (chip, gw, played_at, updated_at)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (chip, gw) DO UPDATE SET
+                played_at=excluded.played_at, updated_at=excluded.updated_at
+            """,
+            (chip["name"], chip["event"], chip.get("time"), now),
+        )
+    conn.commit()
+
+
 # ---------------------------------------------------------------------------
 # The "gold-ready" read path: reshape silver back into the common gameweek
 # frame that features/engineering.py consumes (see that module's INPUT

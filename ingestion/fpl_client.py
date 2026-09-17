@@ -95,3 +95,18 @@ def get_entry_picks(team_id: int, gw: int) -> dict:
 def get_entry_transfers(team_id: int) -> list:
     """Every transfer we've made this season, in chronological order."""
     return _get(f"entry/{team_id}/transfers/")
+
+
+def get_entry_history(team_id: int) -> dict:
+    """Season summary for our entry, including the authoritative ``chips``
+    list: every chip played this season, each as ``{name, time, event}``.
+
+    This is the one source that's complete regardless of which individual
+    gameweeks the weekly job has actually run for - unlike
+    ``my_team_state.active_chip`` (populated per-gameweek from
+    ``get_entry_picks``), which only reflects whatever gameweek happened to
+    be current when the job ran that week. See ingestion/silver.py's
+    ``upsert_chip_usage`` and docs/ingestion_schema.md for why this endpoint,
+    not that column, is what the Chips agent reads chip availability from.
+    """
+    return _get(f"entry/{team_id}/history/")

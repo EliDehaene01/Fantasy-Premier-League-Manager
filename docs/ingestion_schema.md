@@ -63,6 +63,7 @@ CronJob safe to re-run, retry, or overlap with itself):
 | `fixtures` | `fixture_id` | every match: teams, kickoff, score, FDR |
 | `player_gameweek_stats` | (`player_id`, `gw`) | **the core accumulating fact table** - one row per player per gameweek |
 | `my_team_state` | `gw` | our own squad/bank/transfer state that gameweek - the one thing no third-party dataset has |
+| `chip_usage` | (`chip`, `gw`) | every chip played this season - see below, added for the Chips agent |
 
 `player_gameweek_stats` is built from `event/{gw}/live/` - one API call per
 gameweek covering every player, rather than looping `element-summary` per
@@ -73,6 +74,29 @@ current price from a fresh `bootstrap-static` pull (a same-day approximation,
 fine for "the gameweek that just finished"), and precise historical price /
 ownership / transfer-balance for **our own squad only** (~15 players, via
 `element-summary`, bounded and cheap - see `silver.refine_player_gameweek_from_element_summary`).
+
+### Chip usage - a real gap found and fixed while building the Chips agent
+
+The Chips agent needs to know which of the four chips (wildcard, bench
+boost, triple captain, free hit) are still available this season. The
+obvious first place to look, `my_team_state.active_chip`, turned out not
+to answer that reliably: it's populated per-gameweek from
+`entry/{id}/event/{gw}/picks/`, but `my_team_state` itself is only ever
+written by `weekly.py` (never backfilled), so `active_chip` only reflects
+whichever gameweek happened to be current each time the weekly job
+actually ran - a real hole if that job started mid-season or missed a
+week.
+
+The fix: `chip_usage` is populated from a new bronze pull,
+`bronze.fetch_and_land_entry_history` / `fpl_client.get_entry_history`
+(`entry/{id}/history/`), FPL's own authoritative record of every chip
+played this season (`chips: [{name, time, event}, ...]`) - complete
+regardless of ingestion history. `silver.upsert_chip_usage` upserts it on
+`(chip, gw)`, called from `weekly.py` alongside the existing entry/
+transfers pulls. `agents/chips/availability.py` reads this table, not
+`active_chip`, to compute which chips are still available (a flat cap of 2
+uses per chip per season - see that module's docstring for why the exact
+half-season eligibility boundary isn't modeled).
 
 ### Gold - `features/engineering.py`, read via `ingestion/silver.load_gameweek_frame`
 

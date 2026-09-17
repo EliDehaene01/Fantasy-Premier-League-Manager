@@ -1,13 +1,19 @@
-"""Request / response models for the Stats agent service.
+"""Request / response models for every specialist agent service.
 
 The response shape defined here (`AgentArgument`) is the **standard contract
 for every specialist agent** in this project (stats, fixtures, news,
 contrarian, template, chips). If you are writing another specialist, import
-these same field names - the Manager agent aggregates all six on the
-assumption that they look identical. This file lives in `agents/stats/`
-for historical reasons (it was written first, for the Stats agent) but is
-genuinely shared - `agents/news/` imports it directly rather than defining
-its own copy.
+these same field names - the Manager agent aggregates all of them on the
+assumption that they look identical.
+
+This used to live in `agents/stats/schemas.py` (written there first, when
+Stats was the only agent) and was relocated here once a second, third,
+fourth and fifth agent all needed to import it too - a specialist agent
+importing from a package literally named "stats" for its own contract was
+misleading coupling that would only have gotten worse as more agents were
+added. `agents/stats/` and `agents/news/` were both migrated to import from
+here; neither's behavior changed as part of that move (see their own test
+suites, unchanged and still passing).
 """
 
 from __future__ import annotations
@@ -69,14 +75,15 @@ class Recommendation(BaseModel):
     conviction: float = Field(ge=0.0, le=1.0)
     # Optional because not every specialist's recommendation comes with a
     # real predicted-points number. Stats always sets this (it's the model's
-    # actual output). The News agent's "notable positive coverage" pick is a
-    # qualitative judgment from prose ("the manager praised his fitness in
-    # today's press conference") - there is no number behind it, and making
-    # one up (e.g. defaulting to 0.0) would let the Manager's objective
-    # function silently treat "no data" as "predicted zero points", which is
-    # wrong in the opposite direction from the truth. None means exactly
-    # that: no quantitative prediction, weigh this on conviction/reasoning
-    # alone.
+    # actual output); Contrarian sets it too (read from the predictions log -
+    # see agents/contrarian/scoring.py). The News agent's "notable positive
+    # coverage" pick and the Fixtures/Template agents' picks are qualitative
+    # judgments from a different signal entirely - there is no quantitative
+    # prediction behind them, and making one up (e.g. defaulting to 0.0)
+    # would let the Manager's objective function silently treat "no data" as
+    # "predicted zero points", which is wrong in the opposite direction from
+    # the truth. None means exactly that: no quantitative prediction, weigh
+    # this on conviction/reasoning alone.
     predicted_points: float | None = None
 
 
@@ -86,10 +93,42 @@ class VetoStatus(str, Enum):
     FIT = "FIT"
 
 
+class ChipType(str, Enum):
+    WILDCARD = "wildcard"
+    BENCH_BOOST = "bench_boost"
+    TRIPLE_CAPTAIN = "triple_captain"
+    FREE_HIT = "free_hit"
+
+
+class ChipRecommendation(BaseModel):
+    """The Chips agent's timing verdict - the News agent's `Veto` has an
+    exact parallel here: a self-contained judgment with its own confidence
+    and grounding text, not folded into `recommendations` (which argues for
+    PLAYERS) or `vetoes` (which is News-only). Lives here only because this
+    is the shared contract file - never produced by any other specialist.
+    """
+
+    # None is the expected, common answer - most gameweeks have no fixture
+    # shape unusual enough to justify burning a chip. See
+    # agents/chips/scoring.py's module docstring for why defaulting to
+    # "don't play anything" is correct behavior, not a fallback to apologize
+    # for.
+    chip: ChipType | None = None
+    # How confident the agent is in THIS verdict - including the verdict
+    # "don't play a chip yet". A quiet, ordinary gameweek should produce
+    # high confidence in chip=None, not low confidence just because nothing
+    # was recommended.
+    confidence: float = Field(ge=0.0, le=1.0)
+    # Why - which fixture-calendar shape (or absence of one) drove this
+    # verdict. Always populated, even for chip=None: "no chip is right" is
+    # a real, explainable conclusion, not a state with nothing to say.
+    reasoning: str
+
+
 class Veto(BaseModel):
     """One player's availability verdict - the News agent's hard-constraint
-    output (see `AgentArgument.vetoes` below). Never produced by Stats; lives
-    here only because this is the shared contract file, not a Stats concept.
+    output (see `AgentArgument.vetoes` below). Never produced by any other
+    specialist; lives here only because this is the shared contract file.
     """
 
     player_id: int
@@ -99,9 +138,9 @@ class Veto(BaseModel):
     # confidence; an LLM's read of an ambiguous team-news snippet is lower.
     confidence: float = Field(ge=0.0, le=1.0)
     # The actual source text the verdict is grounded in - a Tier 1 rule cites
-    # the raw `news`/`chance_of_playing_this_round` value; a Tier 2 LLM
-    # verdict cites the retrieved passage it read. Never fabricated: if there
-    # is no supporting text, this is None, not a made-up sentence.
+    # the raw `news`/`chance_of_playing_this_round` value; a Tier 2 verdict
+    # cites the retrieved passage it read. Never fabricated: if there is no
+    # supporting text, this is None, not a made-up sentence.
     grounding_snippet: str | None = None
 
 
@@ -118,7 +157,12 @@ class AgentArgument(BaseModel):
     # can read it identically off any agent's response without a special
     # case, even though only News ever populates it.
     vetoes: list[Veto] = Field(default_factory=list)
+    # The Chips agent's timing verdict (see `ChipRecommendation` above) -
+    # None for every specialist except Chips, which argues for WHEN to play
+    # a chip rather than WHICH players to pick, so it leaves
+    # `recommendations` and `vetoes` both empty and uses this field instead.
+    chip_recommendation: ChipRecommendation | None = None
     # 2-4 sentences of natural language for the debate transcript. Grounded in
-    # the model's SHAP factors, written by the LLM (or a templated fallback if
-    # the LLM call fails).
+    # each agent's own deterministic factors, written by the LLM (or a
+    # templated fallback if the LLM call fails).
     reasoning: str

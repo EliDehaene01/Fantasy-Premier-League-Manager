@@ -67,10 +67,12 @@ def test_argue_returns_contract_shape(client, real_players):
     body = resp.json()
 
     # exact top-level shape. `vetoes` is the shared contract's News-agent
-    # field (see agents/stats/schemas.py) - present on every AgentArgument,
+    # field (see shared/contracts.py) - present on every AgentArgument,
     # but Stats never populates it, so it must always come back empty here.
-    assert set(body) == {"agent", "recommendations", "reasoning", "vetoes"}
+    assert set(body) == {"agent", "recommendations", "reasoning", "vetoes", "chip_recommendation"}
     assert body["vetoes"] == []
+    # Stats never populates the Chips agent's timing field either.
+    assert body["chip_recommendation"] is None
     assert body["agent"] == "stats"
     assert isinstance(body["reasoning"], str) and len(body["reasoning"]) > 0
 

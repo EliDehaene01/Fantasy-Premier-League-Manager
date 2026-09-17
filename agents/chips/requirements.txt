@@ -1,0 +1,11 @@
+# Chips agent dependencies.
+
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+openai==3.8.0             # OpenAI-compatible client for Foundry chat completions (reasoning.py)
+python-dotenv==1.2.3
+psycopg2-binary==2.9.13   # ingestion.db (shared Postgres store) - reads my_team_state/chip_usage/predictions_log/fixtures
+
+# --- tests ---
+pytest==9.1.1
+httpx==0.28.1             # required by fastapi.testclient

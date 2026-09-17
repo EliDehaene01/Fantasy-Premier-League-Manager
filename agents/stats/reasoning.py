@@ -19,6 +19,8 @@ from __future__ import annotations
 import logging
 import os
 
+from shared.agent_service import call_foundry_llm, default_foundry_client, llm_disabled
+
 from .model_runtime import Pick
 
 logger = logging.getLogger("stats_agent.reasoning")
@@ -27,8 +29,6 @@ logger = logging.getLogger("stats_agent.reasoning")
 # the credentials themselves reuse the existing MICROSOFT_FOUNDRY_* variables
 # from .env - we do not introduce new names for the same secret.
 FOUNDRY_DEPLOYMENT = os.getenv("STATS_AGENT_LLM_MODEL", "gpt-5.4-nano")
-_ENDPOINT_ENV = "MICROSOFT_FOUNDRY_OPENAI_ENDPOINT"
-_KEY_ENV = "MICROSOFT_FOUNDRY_KEY"
 
 SYSTEM_PROMPT = (
     "You are the Stats specialist on a Fantasy Premier League selection committee. "
@@ -92,55 +92,33 @@ def _build_user_payload(gameweek: int, picks: list[Pick]) -> str:
     return "\n".join(lines)
 
 
-def _default_client():
-    """Build an OpenAI-SDK client pointed at the Foundry deployment.
-
-    Foundry exposes an OpenAI-compatible ``/openai/v1`` surface, so the plain
-    ``OpenAI`` client works with ``base_url`` set to the Foundry endpoint.
-    Raises if the env vars are missing - the caller turns that into a fallback.
-    """
-    # Near-identical to agents/news/tier2.py's and embeddings.py's
-    # _default_client() - see embeddings.py's module docstring for why this
-    # isn't factored into a shared helper.
-    from openai import OpenAI
-
-    endpoint = os.environ[_ENDPOINT_ENV]
-    key = os.environ[_KEY_ENV]
-    return OpenAI(api_key=key, base_url=endpoint, timeout=12.0, max_retries=1)
-
-
-def generate_reasoning(gameweek: int, picks: list[Pick], *, client_factory=_default_client) -> str:
+def generate_reasoning(gameweek: int, picks: list[Pick], *, client_factory=default_foundry_client) -> str:
     """Return the debate argument for these picks.
 
-    Tries the Foundry LLM first; on ANY problem (missing creds, network,
-    rate limit, empty completion) logs it and returns the templated fallback.
-    ``client_factory`` is injectable so tests can stub the LLM.
+    Tries the Foundry LLM first (via shared.agent_service.call_foundry_llm);
+    on ANY problem (missing creds, network, rate limit, empty completion)
+    logs it and returns the templated fallback. ``client_factory`` is
+    injectable so tests can stub the LLM.
     """
     if not picks:
         return _fallback_reasoning(gameweek, picks)
 
     # An explicit off switch for tests and offline/backtest runs, so we never
     # make a real API call where one isn't wanted.
-    if os.getenv("STATS_AGENT_DISABLE_LLM") == "1":
+    if llm_disabled("STATS_AGENT_DISABLE_LLM"):
         return _fallback_reasoning(gameweek, picks)
 
     try:
-        client = client_factory()
-        completion = client.chat.completions.create(
+        return call_foundry_llm(
             model=FOUNDRY_DEPLOYMENT,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": _build_user_payload(gameweek, picks)},
-            ],
+            system_prompt=SYSTEM_PROMPT,
+            user_content=_build_user_payload(gameweek, picks),
             # generous headroom: gpt-5-class models spend some of the budget on
             # internal reasoning tokens before the visible answer, so too small
             # a cap gets truncated mid-sentence.
             max_completion_tokens=600,
+            client_factory=client_factory,
         )
-        text = (completion.choices[0].message.content or "").strip()
-        if not text:
-            raise ValueError("empty completion from Foundry")
-        return text
     except Exception as exc:  # noqa: BLE001 - we genuinely want to catch everything here
         logger.warning("Foundry reasoning call failed (%s); using templated fallback", exc)
         return _fallback_reasoning(gameweek, picks)

@@ -19,7 +19,8 @@ import json
 import logging
 import os
 
-from agents.stats.schemas import Recommendation, Veto, VetoStatus
+from shared.agent_service import call_foundry_llm, default_foundry_client, llm_disabled
+from shared.contracts import Recommendation, Veto, VetoStatus
 
 from . import retrieval, severity_classifier
 from .prompt_shields import screen_passages
@@ -27,8 +28,6 @@ from .prompt_shields import screen_passages
 logger = logging.getLogger("news_agent.tier2")
 
 FOUNDRY_DEPLOYMENT = os.getenv("NEWS_AGENT_LLM_MODEL", "gpt-5.4-nano")
-_ENDPOINT_ENV = "MICROSOFT_FOUNDRY_OPENAI_ENDPOINT"
-_KEY_ENV = "MICROSOFT_FOUNDRY_KEY"
 
 AVAILABILITY_SYSTEM_PROMPT = (
     "You are the availability specialist on a Fantasy Premier League selection committee. "
@@ -53,20 +52,8 @@ POSITIVE_COVERAGE_SYSTEM_PROMPT = (
 )
 
 
-def _default_client():
-    # Near-identical to reasoning.py's and embeddings.py's _default_client() -
-    # see embeddings.py's module docstring for why this isn't factored out.
-    from openai import OpenAI
-
-    return OpenAI(api_key=os.environ[_KEY_ENV], base_url=os.environ[_ENDPOINT_ENV], timeout=12.0, max_retries=1)
-
-
-def _llm_disabled() -> bool:
-    return os.getenv("NEWS_AGENT_DISABLE_LLM") == "1"
-
-
 def classify_availability_zero_shot(
-    player_name: str, passages: list[str], *, client_factory=_default_client
+    player_name: str, passages: list[str], *, client_factory=default_foundry_client
 ) -> dict:
     """The raw zero-shot LLM call, given already-retrieved, already-screened
     passage text - no DB, no retrieval, no Prompt Shields in here.
@@ -85,17 +72,15 @@ def classify_availability_zero_shot(
     Raises on any failure (bad JSON, unexpected status value, network) -
     callers decide what the fallback should be.
     """
-    client = client_factory()
-    completion = client.chat.completions.create(
+    text = call_foundry_llm(
         model=FOUNDRY_DEPLOYMENT,
-        messages=[
-            {"role": "system", "content": AVAILABILITY_SYSTEM_PROMPT},
-            {"role": "user", "content": json.dumps({"player": player_name, "passages": passages})},
-        ],
+        system_prompt=AVAILABILITY_SYSTEM_PROMPT,
+        user_content=json.dumps({"player": player_name, "passages": passages}),
         max_completion_tokens=300,
-        response_format={"type": "json_object"},
+        json_response=True,
+        client_factory=client_factory,
     )
-    data = json.loads(completion.choices[0].message.content or "{}")
+    data = json.loads(text)
     return {
         "status": VetoStatus(data["status"]),  # raises if the model returns anything else
         "confidence": float(data.get("confidence", 0.5)),
@@ -104,7 +89,7 @@ def classify_availability_zero_shot(
 
 
 def resolve_availability(
-    conn, player_id: int, player_name: str, fallback: Veto | None, *, client_factory=_default_client
+    conn, player_id: int, player_name: str, fallback: Veto | None, *, client_factory=default_foundry_client
 ) -> Veto | None:
     """The ambiguous middle Tier 1 left unresolved: retrieve team_news
     passages for this player, screen them, classify with the fine-tuned
@@ -122,7 +107,7 @@ def resolve_availability(
     ``client_factory`` is unused by the classifier path; kept as a parameter
     for test call-site compatibility with the earlier zero-shot signature.
     """
-    if _llm_disabled():
+    if llm_disabled("NEWS_AGENT_DISABLE_LLM"):
         return fallback
     try:
         passages = retrieval.retrieve_passages(
@@ -144,7 +129,7 @@ def resolve_availability(
 
 
 def find_notable_positive_coverage(
-    conn, players: list[tuple[int, str]], *, client_factory=_default_client
+    conn, players: list[tuple[int, str]], *, client_factory=default_foundry_client
 ) -> tuple[list[Recommendation], str | None]:
     """Scan general_news passages across ``players`` (list of (player_id,
     name)); returns (recommendations, reasoning_text). Conservative by
@@ -155,7 +140,7 @@ def find_notable_positive_coverage(
     "no recommendation" rather than guessing, per the task's own
     instruction for this fallback path.
     """
-    if _llm_disabled():
+    if llm_disabled("NEWS_AGENT_DISABLE_LLM"):
         return [], None
     try:
         candidates = []
@@ -172,17 +157,15 @@ def find_notable_positive_coverage(
         if not candidates:
             return [], None
 
-        client = client_factory()
-        completion = client.chat.completions.create(
+        text = call_foundry_llm(
             model=FOUNDRY_DEPLOYMENT,
-            messages=[
-                {"role": "system", "content": POSITIVE_COVERAGE_SYSTEM_PROMPT},
-                {"role": "user", "content": json.dumps({"candidates": candidates})},
-            ],
+            system_prompt=POSITIVE_COVERAGE_SYSTEM_PROMPT,
+            user_content=json.dumps({"candidates": candidates}),
             max_completion_tokens=500,
-            response_format={"type": "json_object"},
+            json_response=True,
+            client_factory=client_factory,
         )
-        data = json.loads(completion.choices[0].message.content or "{}")
+        data = json.loads(text)
         recs = [
             Recommendation(player_id=item["player_id"], conviction=float(item.get("conviction", 0.5)))
             for item in data.get("notable", [])

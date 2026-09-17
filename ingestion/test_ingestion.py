@@ -51,7 +51,7 @@ from ingestion.db import get_connection
 TEST_SCHEMA = "test_ingestion"
 _ALL_TABLES = [
     "bronze_responses", "teams", "players", "gameweeks",
-    "fixtures", "player_gameweek_stats", "my_team_state",
+    "fixtures", "player_gameweek_stats", "my_team_state", "chip_usage",
 ]
 
 
@@ -123,6 +123,10 @@ ENTRY_TRANSFERS = [
     {"element_in": 102, "element_in_cost": 60, "element_out": 103, "element_out_cost": 55,
      "entry": 555, "event": 2, "time": "2025-08-20T12:00:00Z"},
 ]
+ENTRY_HISTORY = {
+    "current": [], "past": [],
+    "chips": [{"name": "wildcard", "time": "2025-08-18T09:00:00Z", "event": 2}],
+}
 
 
 def _element_summary(player_id: int) -> dict:
@@ -145,6 +149,7 @@ def patched_client(monkeypatch):
     monkeypatch.setattr(fpl_client, "get_entry", lambda team_id: ENTRY)
     monkeypatch.setattr(fpl_client, "get_entry_picks", lambda team_id, gw: ENTRY_PICKS_GW2)
     monkeypatch.setattr(fpl_client, "get_entry_transfers", lambda team_id: ENTRY_TRANSFERS)
+    monkeypatch.setattr(fpl_client, "get_entry_history", lambda team_id: ENTRY_HISTORY)
     monkeypatch.setattr(fpl_client, "get_element_summary", lambda player_id: _element_summary(player_id))
     monkeypatch.setenv("FPL_TEAM_ID", "555")
 
@@ -233,3 +238,22 @@ def test_weekly_populates_my_team_state(patched_client, conn):
     row = conn.execute("SELECT * FROM my_team_state WHERE gw = 2").fetchone()
     assert row is not None
     assert row["bank"] == pytest.approx(0.5)
+
+
+def test_weekly_populates_chip_usage_from_entry_history(patched_client, conn):
+    """The real gap this covers: chip_usage must come from entry/history's
+    complete `chips` list, not be silently empty just because this is the
+    first week the job has ever run for this account (my_team_state.active_chip
+    for THIS gameweek is None in the fixture - see ENTRY_PICKS_GW2 - so a
+    my_team_state-derived answer would have missed the wildcard entirely)."""
+    weekly.run_weekly(conn)
+    row = conn.execute("SELECT * FROM chip_usage WHERE chip = 'wildcard' AND gw = 2").fetchone()
+    assert row is not None
+    assert row["played_at"] == "2025-08-18T09:00:00Z"
+
+
+def test_idempotent_chip_usage_upsert(patched_client, conn):
+    silver.upsert_chip_usage(conn, ENTRY_HISTORY["chips"])
+    silver.upsert_chip_usage(conn, ENTRY_HISTORY["chips"])
+    count = conn.execute("SELECT COUNT(*) FROM chip_usage").fetchone()[0]
+    assert count == 1  # re-upserting the same (chip, gw) replaces, not duplicates

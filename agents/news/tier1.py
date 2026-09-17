@@ -43,7 +43,7 @@ Given (chance_of_playing_this_round: float | None, news: str | None):
 
 from __future__ import annotations
 
-from agents.stats.schemas import Veto, VetoStatus
+from shared.contracts import Veto, VetoStatus
 
 # Case-insensitive substrings that FPL's own `news` field uses for a
 # definite, non-negotiable absence. Kept as a short, explicit list rather

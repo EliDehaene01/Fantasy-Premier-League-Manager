@@ -1,7 +1,7 @@
 """News agent - FastAPI service.
 
 One endpoint, ``POST /argue``, same shared contract every specialist uses
-(``agents/stats/schemas.py``). Unlike Stats, this agent's response actually
+(``shared/contracts.py``). Unlike Stats, this agent's response actually
 uses BOTH output fields: ``vetoes`` (availability, a hard constraint on the
 Manager) and ``recommendations`` (notable positive coverage, a normal vote)
 - see agents/news/__init__.py for why those are different kinds of output
@@ -24,17 +24,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from agents.stats.schemas import AgentArgument, ArgueRequest, Veto
+from shared.agent_service import create_service
+from shared.contracts import AgentArgument, ArgueRequest, Veto
 
 from . import tier2
 from .tier1 import check_tier1
-
-try:  # load .env locally; harmless if python-dotenv isn't installed in prod
-    from dotenv import load_dotenv
-
-    load_dotenv()
-except ImportError:  # pragma: no cover
-    pass
 
 log = logging.getLogger("news_agent")
 
@@ -59,16 +53,11 @@ async def lifespan(app: FastAPI):
         app.state.db_conn.close()
 
 
-app = FastAPI(title="FPL News agent", version="1.0", lifespan=lifespan)
-
-
-@app.get("/health")
-def health() -> dict:
+def _health(app: FastAPI) -> dict:
     return {"status": "ok", "db_connected": app.state.db_conn is not None}
 
 
-@app.post("/argue", response_model=AgentArgument)
-def argue(request: ArgueRequest) -> AgentArgument:
+def _argue(app: FastAPI, request: ArgueRequest) -> AgentArgument:
     conn = app.state.db_conn
     vetoes: list[Veto] = []
     unresolved: list[tuple[int, str]] = []
@@ -103,3 +92,8 @@ def argue(request: ArgueRequest) -> AgentArgument:
         reasoning = "No availability concerns or notable positive coverage found this gameweek."
 
     return AgentArgument(agent="news", recommendations=recommendations, vetoes=vetoes, reasoning=reasoning)
+
+
+app = create_service(
+    title="FPL News agent", argue_handler=_argue, health_handler=_health, lifespan=lifespan
+)

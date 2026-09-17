@@ -59,6 +59,13 @@ def run_weekly(conn: "db.Connection", *, team_id: int | None = None) -> dict:
 
     entry = bronze.fetch_and_land_entry(conn, team_id)
     transfers = bronze.fetch_and_land_entry_transfers(conn, team_id)
+
+    # Chip usage: from entry/history's authoritative `chips` list, not
+    # derived from this gameweek's active_chip below - see
+    # silver.upsert_chip_usage's docstring for why.
+    history = bronze.fetch_and_land_entry_history(conn, team_id)
+    silver.upsert_chip_usage(conn, history.get("chips", []))
+
     squad_ids: list[int] = []
     if state_gw is not None:
         picks = bronze.fetch_and_land_entry_picks(conn, team_id, state_gw)

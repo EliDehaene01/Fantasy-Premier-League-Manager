@@ -35,9 +35,7 @@ Note on the News agent: availability gets special treatment because it can act a
 
 ### Manager agent (decision)
 
-- Collects the specialists' arguments and turns them into an objective function (predicted points, weighted by conviction and adjusted for availability risk).
-- Calls the **solver** (PuLP/OR-Tools) as a tool to produce a feasible 15-man squad: ≤£100m budget, ≤3 players per club, valid formation, transfer-hit cost (−4 pts per transfer beyond the free allowance).
-- Decides captain and vice-captain.
+- Aggregates the four adjustment agents' conviction scores as a multiplicative weighting on top of Stats' predicted points, applies News' vetoes as hard/steep constraints, calls the solver, and picks captain/vice-captain deterministically. Full mechanics — weights, the multiplicative formula, why Stats sits outside the weighted sum, veto handling, the bounded reaction round — are in section 6b, not repeated here.
 - Hands the result to the human-in-the-loop step instead of applying it directly.
 
 ## 3. The data science pipeline (Stats agent)
@@ -107,14 +105,40 @@ This is genuinely complementary to the Contrarian agent, not redundant with it: 
 - **Scope**: a small classifier that rates injury severity/return timeline from scraped text, rather than a general-purpose fine-tuned chat model — a bounded, evaluable task. Deliberately scoped to availability only, not stretched to also judge "notable positive coverage" — that's a much fuzzier task, and mixing two different kinds of labels into one classifier would weaken its evaluation story. The positive-coverage judgment stays an LLM call, made explicitly as a softer, qualitative call rather than something with a precision/recall number behind it.
 - **Evaluation**: precision/recall against a held-out labeled set, compared explicitly against a zero-shot prompting baseline, so the fine-tune's value is demonstrated with a real before/after number rather than asserted qualitatively.
 
-## 6. Orchestration: LangGraph
+## 6. Orchestration: the solver, the Manager, and LangGraph
 
-- **Typed state**: an explicit state object (squad, bank, free transfers, chips used, current gameweek, debate arguments, solver result, approval status) — every field the system tracks is visible in the schema, not buried in a conversation history.
-- **Graph**: nodes for ingestion, each specialist agent, the manager, the solver call, and the human-approval gate; conditional edges handle cases like an infeasible solver result routing back to the manager for revision.
-- **Persistence**: a checkpointer (Postgres) saves graph state after every step, so the weekly run can resume correctly across a full season without needing to reconstruct history from scratch.
-- **Human-in-the-loop**: the graph pauses at the approval node using LangGraph's `interrupt()`, holding state until the human responds; resuming with `Command(resume=...)` continues the graph from exactly that point. This is the mechanism behind recommend-and-confirm — the pause is a genuine graph state, not a chat message waiting to be replied to.
+Three pieces work together here: the solver turns opinions into a legal squad, the Manager is the bridge between six agents' outputs and the solver's inputs, and LangGraph sequences the whole thing and owns the human-approval pause.
 
-Each specialist agent, though orchestrated by one LangGraph process, still runs as its own containerized service (see section 7) — a graph node calls out to that service over HTTP/gRPC rather than running the agent's logic in-process. This keeps the "genuinely distributed, containerized multi-agent system" story intact while using LangGraph for the state machine itself.
+### 6a. Solver
+
+- **Library**: PuLP over OR-Tools — this is a small linear problem (a few hundred binary variables, simple constraints), nowhere near the scale where OR-Tools' extra power matters, and PuLP's API is more direct for this shape of problem. Documented here rather than left implicit, same as the MLP-vs-trees decision earlier in the project.
+- **Objective**: maximize total `adjusted_score` (defined in 6b) across the selected starting 11.
+- **Constraints**: ≤£100m budget, ≤3 players per club, valid formation (1 GK; DEF 3-5; MID 2-5; FWD 1-3), 15-man squad. Transfers beyond the free allowance cost -4pts, priced directly into the objective so a hit only gets taken when the points gain justifies it.
+- **Chip-aware constraints**: normal weeks are bounded by free transfers (rolls over, capped); a Wildcard or Free Hit week (driven by the Chips agent's recommendation) allows unlimited free transfers instead — the solver needs to know which chip is active, since Free Hit reverts after one gameweek while Wildcard is permanent.
+- **Hard exclusion**: any player the News agent has vetoed OUT is removed from the candidate pool entirely before the solver runs, not merely penalized.
+- **Infeasibility handling**: retry once allowing one additional transfer hit; if still infeasible, stop and surface "no valid plan found" to the human rather than looping or producing a degenerate squad.
+
+### 6b. Manager: aggregation, weights, and captain selection
+
+- **Stats' `predicted_points` is the base currency** the solver actually optimizes — the only agent with a real, backtested points estimate behind it.
+- **Four adjustment agents** — Fixtures, Contrarian, Template, and the News agent's `recommendations` (not its `vetoes`, which are handled separately below) — each contribute a conviction score, combined **multiplicatively**: `adjusted_score = predicted_points × (1 + Σ weight_i × conviction_i)`. Multiplicative rather than additive, so a flat bonus doesn't over-value a low-ceiling bench player the same as a star.
+- **Weights are fixed and config-driven, not decided by the LLM per run** — reproducibility matters for backtesting specifically; the same inputs must always produce the same squad, which a freely-adjusted LLM weighting would break. Starting values, documented as an untuned baseline to revisit once backtest evidence exists (same spirit as the untuned-vs-tuned XGBoost result): Fixtures = Contrarian = Template = 1.0, **News = 1.3** — weighted higher, since its RAG-grounded qualitative signal (press-conference comments, breakout performances) is closer to genuine inside information than the other three's more mechanical signals.
+- **Missing opinions default to zero adjustment** (an agent's list not including a given player), not a crash or a worst-case assumption.
+- **Stats itself sits outside this weighted sum by design**, not oversight — it's the base every other agent adjusts, already structurally privileged because it's the only agent with real predictive validation behind it, rather than one more dial to tune.
+- **News's `vetoes` are handled separately from the weighted sum**: `OUT` hard-excludes a player from the solver's candidate pool entirely (see 6a); `DOUBT` applies a steep multiplicative penalty to `adjusted_score`, scaled by the News agent's confidence, rather than a binary exclusion — a correctly-valued doubtful player might still be worth squadding even if benched.
+- **Captain/vice-captain is deterministic**, not an LLM judgment call — highest and second-highest `adjusted_score` among the finalized starting 11.
+- **The LLM call's role is narration only**: it explains the already-computed decision (why this squad, why this captain, notable trade-offs worth the human's attention) — it does not make the decision.
+- **Reaction round** (transcript richness, not decision-making): after all six agents submit their single-round outputs, one additional bounded round lets each agent see the full set of first-round outputs and write a short, text-only reaction to whatever conflicts with its own view (e.g. Contrarian acknowledging its top pick got vetoed and naming its next choice). This reaction cannot alter `conviction`, `recommendations`, or `vetoes` — the Manager still computes the squad from the original deterministic numbers. It exists purely so the displayed transcript reads as a genuine exchange rather than six monologues, without reopening the reproducibility problem a true multi-turn debate (agents revising positions, changing the final outcome) would cause.
+
+### 6c. LangGraph topology
+
+- **Typed state**: squad, bank, free transfers, chips used, current gameweek, each agent's raw output, the reaction-round text, solver result, approval status.
+- **Graph**: ingestion → six specialist calls (genuinely parallel — independent HTTP calls, no reason to serialize them) → the bounded reaction round → Manager (aggregate, call solver, retry-on-infeasible, pick captain, narrate) → a mode-dependent branch.
+- **Mode branch**: live mode pauses at the human-approval node via `interrupt()`, holding state until reviewed; `Command(resume=...)` continues from exactly that point. Backtest mode skips the interrupt entirely and auto-accepts the Manager's proposal — a 38-gameweek backtest can't pause for approval 38 times, and this needed deciding explicitly rather than being discovered mid-run.
+- **Persistence**: a Postgres checkpointer saves graph state after every step, so a run resumes correctly without reconstructing history from scratch.
+- **Rejection/timeout**: logged as declined, no auto-retry or negotiation loop. A richer "reject with feedback, Manager reconsiders" flow is a legitimate future extension, not built now.
+
+Each specialist agent, though orchestrated by one LangGraph process, still runs as its own containerized service (see section 8) — a graph node calls out to that service over HTTP rather than running the agent's logic in-process.
 
 ## 7. Model hosting & guardrails: Microsoft Foundry
 
@@ -129,14 +153,27 @@ Each specialist agent, though orchestrated by one LangGraph process, still runs 
 
 ## 8. Containerization & Kubernetes topology
 
-Namespace: `fpl-agents`
+Namespace: `fpl-agents`. Runs on a **local Kubernetes cluster** (Docker Desktop's built-in Kubernetes), not a cloud cluster — a CronJob demonstrates the same orchestration skill whether it's running locally or in the cloud, and a cloud cluster would mean real ongoing cost for a project whose purpose is portfolio demonstration and managing one real team. See 8b for what running locally actually implies operationally.
 
 - **CronJob** (`deadline-checker`) — runs daily, checks the FPL fixtures endpoint for the next deadline; if it's within ~24-36 hours, triggers the pipeline Job. Avoids hardcoding a schedule around FPL's irregular deadline days.
-- **Job** (`ingestion`) — pulls and normalizes fresh data (FPL API + injury/team-news text), writes to a shared store (Postgres or object storage) the other pods read from.
+- **Job** (`ingestion`) — pulls and normalizes fresh data (FPL API + scraped news text), writes to Postgres (bronze/silver/gold, as in the model lifecycle section).
 - **Deployment** (`orchestrator`) — runs the LangGraph process and its Postgres checkpointer; calls out to each specialist service as a graph node.
 - **Deployments**, one per specialist service — `stats`, `fixtures`, `news`, `contrarian`, `template`, `chips`, `manager`, `solver` — each a small containerized service exposing one job.
-- **ConfigMaps/Secrets** — Microsoft Foundry endpoint and keys, FPL session details (only needed once auto-apply is added — see below), model/classifier artifacts.
-- **Job** (`notifier`) — sends the weekly recommendation (email/Slack/webhook) once the manager's proposal is ready and the graph has reached the approval interrupt.
+- **ConfigMaps/Secrets** — Microsoft Foundry endpoint and keys, model/classifier artifacts.
+- **Job** (`frontend-export`) — once the Manager's proposal is ready (or, later, once a gameweek's actual results land), exports the gameweek's data as a static JSON file and commits/pushes it to the frontend's repo, triggering a GitHub Pages rebuild (see 8a). This replaces a push-notification step entirely — there is no separate notifier service; the static site update *is* the mechanism, checked by pulling rather than being pushed to.
+
+## 8a. Frontend & GitHub Pages
+
+- **Stack**: React, deployed to GitHub Pages — a genuine frontend-engineering artifact alongside the backend/ML/agentic work, not a data-dashboard afterthought.
+- **Static, not backend-connected**: GitHub Pages only serves static files, and rather than standing up a separate publicly-hosted API for the frontend to call (real ongoing cost, and a new public attack surface on top of the database), the weekly pipeline **exports each gameweek's result as a static JSON file and commits it to the frontend repo**. The React app only ever reads these files — it never talks to Postgres, directly or indirectly. Standard JAMstack pattern, not a workaround.
+- **Two data drops per gameweek**: once when the Manager's proposal is ready (pending-approval state: proposed squad, captain, chip call, full six-agent transcript including the reaction round), and again once real results land (final state: actual points scored, shown alongside what was proposed). These are two views of the same underlying gameweek record, not two different data models — the frontend renders whichever state the JSON says it's in.
+- **What's displayed per gameweek**: the chosen/proposed team, the full agent transcript (each specialist's first-round output plus the bounded reaction round), and — once played — the actual points the team received, shown against the backtest's benchmark (average manager score) for continuity with how the backtest engine already reports results.
+- **No auto-apply, no PR-based approval mechanism**: recommend-and-confirm stays exactly as originally scoped — the human reviews and applies changes manually in the real FPL app. The frontend is a record of what was proposed and what happened, not a control surface.
+
+## 8b. Local deployment & scheduling
+
+- The CronJob runs on Docker Desktop's local Kubernetes, which means the machine needs to actually be on and awake at trigger time — not just a technicality, worth testing once rather than assumed. Windows Task Scheduler's "wake this computer to run this task" option handles this if the machine sleeps.
+- No push notification (email/Slack) is sent — the weekly export to GitHub Pages is the entire signal; checking it before each deadline is on the human, by deliberate choice, not a gap in the system.
 
 ## 9. Backtest engine
 
@@ -145,7 +182,7 @@ To avoid lookahead bias, the backtest walks forward strictly in time:
 1. Initialize state: starting squad, £100m bank, 1 free transfer, all chips available.
 2. For each gameweek in the historical season:
    - Feed agents only data available *before* that gameweek's deadline (form/fixtures/ownership as of that point).
-   - Run the full debate → manager → solver pipeline (guardrail calls stubbed — no real external text in backtest mode).
+   - Run the full debate → manager → solver pipeline (guardrail calls stubbed — no real external text in backtest mode; the human-approval interrupt is skipped per the backtest-mode branch in 6c, auto-accepting the Manager's proposal).
    - Score the resulting squad against the *actual* results for that gameweek; apply transfer-hit penalties and chip effects.
    - Roll the updated state into the next gameweek via the same LangGraph checkpointing used in live mode.
 3. Report:
@@ -155,11 +192,11 @@ To avoid lookahead bias, the backtest walks forward strictly in time:
 ## 10. Human-in-the-loop: recommend and confirm
 
 1. The graph reaches the approval node and calls `interrupt()`, pausing with the full proposal (transfers in/out, captain, chip recommendation, and a short summary of *why*, drawn from the agent debate) held in checkpointed state.
-2. The Notifier sends that proposal to the human.
-3. The human reviews and applies the change manually in the real FPL team (or via a simple approve action that resumes the graph, logged for later analysis).
+2. The `frontend-export` job publishes that proposal to GitHub Pages (see 8a) — no push notification is sent; the human checks the site before each deadline by choice, not because the system pings them.
+3. The human reviews and applies the change manually in the real FPL team.
 4. No automatic write to the live FPL account happens in this version — applying changes to a real account requires FPL's unofficial, session-cookie-based API, which is out of scope until the recommendation quality is trusted.
 
-Auto-apply is a natural stretch goal once the above is working reliably (see TODO.md).
+Auto-apply was scoped out deliberately (considered, including a PR-merge-triggered design) rather than left unconsidered — worth revisiting once the recommendation quality is trusted over a real stretch of gameweeks.
 
 ## 11. Observability
 
@@ -169,6 +206,8 @@ Auto-apply is a natural stretch goal once the above is working reliably (see TOD
 
 ## 12. Future extensions
 
-- Auto-apply to the live FPL account once trust is established.
+- Auto-apply to the live FPL account once trust is established — a PR-based approval mechanism was designed and deliberately not built yet (GitHub Actions workflow triggered on merge, using FPL's unofficial session-based login, with a dry-run period before trusting a real submit). Revisit once the recommend-and-confirm loop has run reliably over real gameweeks.
+- A richer "reject with feedback, Manager reconsiders" flow, instead of a plain rejection/timeout being logged as declined.
+- A genuine multi-turn debate where agents can revise positions based on each other's arguments, rather than the current bounded, decision-inert reaction round — deliberately deferred since it would reopen the reproducibility guarantee the fixed-weight aggregation was built to protect.
 - Multi-league / mini-league-aware strategy (e.g. optimizing for rank within a specific mini-league rather than overall rank).
 - Richer chip strategy (e.g. reasoning jointly about wildcard timing and an upcoming double gameweek rather than treating them as separate decisions).

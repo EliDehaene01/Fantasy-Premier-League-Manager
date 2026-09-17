@@ -84,3 +84,9 @@ def fetch_and_land_entry_transfers(conn: "db.Connection", team_id: int) -> list:
     payload = fpl_client.get_entry_transfers(team_id)
     land_raw(conn, "entry-transfers", {"team_id": team_id}, payload)
     return payload
+
+
+def fetch_and_land_entry_history(conn: "db.Connection", team_id: int) -> dict:
+    payload = fpl_client.get_entry_history(team_id)
+    land_raw(conn, "entry-history", {"team_id": team_id}, payload)
+    return payload

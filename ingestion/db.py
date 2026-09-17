@@ -158,6 +158,23 @@ CREATE TABLE IF NOT EXISTS my_team_state (
     updated_at TEXT NOT NULL
 );
 
+-- Every chip played this season, from the FPL API's authoritative
+-- entry/{id}/history/ endpoint (ingestion/silver.py::upsert_chip_usage) -
+-- NOT derived from my_team_state.active_chip above, which only reflects
+-- whichever gameweek happened to be current each time the weekly job ran
+-- and so has real gaps if that job started mid-season or missed a week.
+-- The Chips agent (agents/chips/) reads this table to know which chips are
+-- still available, not my_team_state. (chip, gw) is the natural key since
+-- the same chip type can legitimately be played twice in a season (FPL
+-- grants one of each chip per season half) but never twice in one gameweek.
+CREATE TABLE IF NOT EXISTS chip_usage (
+    chip TEXT NOT NULL,        -- FPL's own raw chip code: "wildcard", "3xc", "bboost", "freehit"
+    gw INTEGER NOT NULL,
+    played_at TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (chip, gw)
+);
+
 -- Stats agent model lifecycle (docs/monitoring.md documents this loop in
 -- full). Append-only, like bronze_responses - a prediction is a point-in-
 -- time record of what the model said, not something later rows replace.
