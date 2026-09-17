@@ -80,13 +80,13 @@
 - [ ] Run a full-season backtest and write up results
 
 ## Phase 3 — Orchestration (LangGraph)
-- [ ] Define the typed state schema (squad, bank, free transfers, chips, current gameweek, each agent's raw output, reaction-round text, solver result, approval status)
-- [ ] Build the StateGraph: ingestion -> six specialist calls (genuinely parallel) -> bounded reaction round -> manager -> solver -> mode-dependent branch
-- [ ] Implement the mode branch: live pauses at the human-approval interrupt; backtest skips it and auto-accepts the Manager's proposal
-- [ ] Add conditional edges (e.g. infeasible solver result routes back to the manager for the retry-with-extra-hit logic)
-- [ ] Wire up a Postgres checkpointer for persistence across weekly runs
-- [ ] Implement the human-approval `interrupt()` / `Command(resume=...)` flow; rejection/timeout just logs as declined, no retry loop
-- [ ] Test a full backtest gameweek and a full local "live" dry run end-to-end
+- [x] Define the typed state schema (squad, bank, free transfers, chips, current gameweek, each agent's raw output, reaction-round text, solver result, approval status)
+- [x] Build the StateGraph: six specialist calls (genuinely parallel) -> bounded reaction round -> manager (which internally calls the solver, per ARCHITECTURE.md 6c's node description) -> mode-dependent branch -- "ingestion" is upstream of this graph, not a node inside it (see orchestrator/graph.py's module docstring for why)
+- [x] Implement the mode branch: live pauses at the human-approval interrupt; backtest skips it and auto-accepts the Manager's proposal
+- [x] Add conditional edges: infeasible Manager result routes to a `declined` terminal, not back to the Manager -- the retry-with-extra-hit logic already runs INSIDE one Manager call (solver/optimizer.py's own two-attempt solve), so a graph-level loop would just re-run the identical infeasible solve (see orchestrator/graph.py's module docstring)
+- [x] Wire up a Postgres checkpointer for persistence across weekly runs (`orchestrator/run.py::postgres_checkpointer`; the orchestrator's own tests use an in-memory checkpointer, consistent with every other DB-touching component in this repo needing a live Postgres to test against for real)
+- [x] Implement the human-approval `interrupt()` / `Command(resume=...)` flow; rejection/timeout just logs as declined, no retry loop
+- [x] Test a full backtest gameweek and a full local "live" dry run end-to-end (fake service callers standing in for live HTTP/Postgres -- Phase 4 containerization hasn't happened yet, so a true multi-service integration run isn't possible until then)
 
 ## Phase 4 — Containerization
 - [ ] Write a Dockerfile per specialist service (stats, fixtures, news, contrarian, template, chips, manager, solver, ingestion, frontend-export, orchestrator)
