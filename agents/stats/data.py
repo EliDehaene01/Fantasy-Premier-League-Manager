@@ -137,6 +137,16 @@ def load_gameweeks(csv_path: Path | str = RAW_CSV) -> pd.DataFrame:
     # value (price) is stored as an integer 10x the on-screen price (40 == 4.0).
     collapsed["price"] = collapsed["value"] / 10.0
 
+    # Additive alias, not a rename - reconcile_archive.py's DIRECT_RENAME
+    # still expects `element` present on this function's output and does
+    # its own element -> player_id rename; this alias is purely so
+    # features/engineering.py (which is source-agnostic between this
+    # archive path and silver's live path) has a `player_id` column to
+    # optionally carry through under the SAME name silver already uses,
+    # rather than every downstream consumer needing to know it's called
+    # `element` here specifically. See that module's INPUT CONTRACT note.
+    collapsed["player_id"] = collapsed["element"]
+
     collapsed["season"] = _infer_season(csv_path)
     return collapsed.sort_values(["name", "GW"]).reset_index(drop=True)
 

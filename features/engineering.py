@@ -41,6 +41,19 @@ produce - see the loader docstrings for how each one gets there):
     selected, transfers_balance, kickoff_time, n_fixtures,
     expected_goals, expected_goals_conceded, team_h_score, team_a_score
 
+``player_id`` is OPTIONAL but strongly recommended: if present, it is carried
+through to the output frame untouched (never added to ``feature_columns`` -
+it is an identity, not a signal). Both loaders now provide it
+(``ingestion/silver.py::load_gameweek_frame`` selects it directly;
+``agents/stats/data.py::load_gameweeks`` aliases the archive's `element`
+column to it), but historically neither did, and callers matched rows back
+to a player by ``name`` alone - a display string, not a stable id, which is
+exactly the kind of silent wrong-match risk (two players sharing a name,
+a mid-season name-format change) this project has already been burned by
+once (see the entity-linking discipline `agents/news/`'s corpus-tagging
+step follows for the same reason). Prefer joining on ``player_id`` wherever
+it's available; ``name`` remains for cases with no numeric id at hand.
+
 ``season`` is OPTIONAL: if present, every rolling/grouping operation below
 keys on (season, ...) instead of just (...), so two different seasons'
 gameweek numbering never bleeds into each other's rolling windows - this is
@@ -391,7 +404,10 @@ def build_features_from_frame(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]
     # (e.g. gameweek 1, where even the cold-start position average is empty).
     df[feature_cols] = df[feature_cols].fillna(0.0)
 
+    had_player_id = "player_id" in df.columns
     keep = ["season", "name", "position", "team", "GW", "minutes", target, *feature_cols]
+    if had_player_id:
+        keep = ["player_id", *keep]
     out = df[keep].reset_index(drop=True)
     if not had_season:
         out = out.drop(columns=["season"])

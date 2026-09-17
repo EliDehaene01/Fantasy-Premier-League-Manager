@@ -358,6 +358,7 @@ def load_gameweek_frame(conn: "db.Connection") -> pd.DataFrame:
     query = """
         SELECT
             pgs.gw AS "GW",
+            pgs.player_id AS player_id,
             p.web_name AS name,
             p.position AS position,
             t.name AS team,
