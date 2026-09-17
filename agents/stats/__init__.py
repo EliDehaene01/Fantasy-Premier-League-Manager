@@ -8,7 +8,8 @@ Three parts, see agents/stats/README.md for the full breakdown:
     hyperparameter tuning, and SHAP explainability. Produces
     ``models/stats_model.pkl``.
   * the FastAPI service (``service.py``, ``model_runtime.py``,
-    ``reasoning.py``, ``schemas.py``) - loads that model and answers
+    ``reasoning.py``, using the shared contract in
+    ``shared/contracts.py``) - loads that model and answers
     ``POST /argue`` in the gameweek debate, calling out to a Foundry LLM for
     the prose only.
   * the model lifecycle loop (``predictions_log.py``, ``monitor.py``,

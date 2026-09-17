@@ -1,7 +1,7 @@
 # Build plan
 
 ## Known issues
-- [ ] agents/stats's test_stats_agent.py and test_monitor.py can't be collected due to a Windows Application Control/Smart App Control policy blocking scipy's compiled DLLs on this machine -- pre-existing environment issue, not caused by any change in this project; needs local allowlisting or a re-signed scipy build to resolve, deferred for now
+- Local Postgres (port 5433, per `.env`) must be running for any DB-touching test (chips/contrarian/fixtures/template agents, stats monitor, ingestion) -- `docker compose up` once Phase 4 exists; until then start the container manually.
 
 ## Phase 0 — Setup
 - [ ] Repo scaffold (project structure, `pyproject.toml`/`requirements.txt`, linting, `CLAUDE.md`)
@@ -56,11 +56,11 @@
 - [x] Write the Chips agent (chip-timing logic against the fixture calendar, extending the shared contract with a `chip_recommendation` field)
 
 ### Solver
-- [ ] Build the solver as a PuLP LP: budget, per-club cap, formation, squad-size constraints
-- [ ] Price transfer-hit cost (-4pts beyond free allowance) directly into the objective
-- [ ] Add chip-aware constraints: unlimited free transfers under Wildcard/Free Hit (distinguish Free Hit's one-gameweek revert from Wildcard's permanence)
-- [ ] Hard-exclude News-vetoed OUT players from the candidate pool before solving
-- [ ] Implement infeasibility handling: retry once with one additional transfer hit allowed, then surface "no valid plan found" rather than looping
+- [x] Build the solver as a PuLP LP: budget, per-club cap, formation, squad-size constraints
+- [x] Price transfer-hit cost (-4pts beyond free allowance) directly into the objective
+- [x] Add chip-aware constraints: unlimited free transfers under Wildcard/Free Hit -- the solver treats both identically (unlimited this gameweek); distinguishing Free Hit's one-gameweek revert from Wildcard's permanence is squad-state tracking across gameweeks, owned by Phase 2's backtest state tracking / the future Manager, not a single /solve call
+- [x] Hard-exclude News-vetoed OUT players from the candidate pool before solving
+- [x] Implement infeasibility handling: retry once with one additional transfer hit allowed, then surface "no valid plan found" rather than looping
 
 ### Manager
 - [ ] Implement the multiplicative aggregation formula (predicted_points x (1 + sum of weight_i x conviction_i)) across the four adjustment agents (Fixtures, Contrarian, Template, News recommendations)
