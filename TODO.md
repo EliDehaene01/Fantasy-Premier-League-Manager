@@ -63,12 +63,12 @@
 - [x] Implement infeasibility handling: retry once with one additional transfer hit allowed, then surface "no valid plan found" rather than looping
 
 ### Manager
-- [ ] Implement the multiplicative aggregation formula (predicted_points x (1 + sum of weight_i x conviction_i)) across the four adjustment agents (Fixtures, Contrarian, Template, News recommendations)
-- [ ] Make weights fixed and config-driven (starting values: Fixtures = Contrarian = Template = 1.0, News = 1.3), not LLM-decided -- document as an untuned baseline to revisit with backtest evidence
-- [ ] Implement News vetoes handling: OUT hard-excludes (solver-side), DOUBT applies a steep multiplicative penalty scaled by confidence
-- [ ] Implement deterministic captain/vice-captain selection (highest/second-highest adjusted_score among the finalized starting 11)
-- [ ] Build the Manager's LLM narration call (explains the already-computed decision; does not decide)
-- [ ] Build the bounded reaction round: each agent sees all first-round outputs, writes a text-only reaction that cannot alter conviction/recommendations/vetoes
+- [x] Implement the multiplicative aggregation formula (predicted_points x (1 + sum of weight_i x conviction_i)) across the four adjustment agents (Fixtures, Contrarian, Template, News recommendations)
+- [x] Make weights fixed and config-driven (starting values: Fixtures = Contrarian = Template = 1.0, News = 1.3), not LLM-decided -- document as an untuned baseline to revisit with backtest evidence
+- [x] Implement News vetoes handling: OUT hard-excludes (solver-side), DOUBT applies a steep multiplicative penalty scaled by confidence
+- [x] Implement deterministic captain/vice-captain selection (highest/second-highest adjusted_score among the finalized starting 11)
+- [x] Build the Manager's LLM narration call (explains the already-computed decision; does not decide)
+- [x] Build the bounded reaction round: each agent sees all first-round outputs, writes a text-only reaction that cannot alter conviction/recommendations/vetoes
 
 ## Phase 2 — Backtest engine
 - [ ] Implement state tracking (squad, bank, free transfers, chips used) across gameweeks

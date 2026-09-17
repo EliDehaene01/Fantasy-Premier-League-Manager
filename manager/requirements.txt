@@ -1,0 +1,11 @@
+# Manager service dependencies.
+
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+openai==3.8.0             # OpenAI-compatible client for Foundry chat completions (narration.py, reaction.py)
+python-dotenv==1.2.3
+pulp==3.3.2               # solver.optimizer, called directly (see service.py's module docstring)
+
+# --- tests ---
+pytest==9.1.1
+httpx==0.28.1             # required by fastapi.testclient
