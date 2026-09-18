@@ -121,11 +121,11 @@
 - [x] (Stretch) Add a lightweight approve/reject action that resumes the LangGraph interrupt and logs the decision -- scripts/approve_gameweek.py, run for real against the live k8s deployment: triggered a real gameweek (POST /run, paused at the interrupt with a genuine feasible squad from all six live specialist services), then resumed it (POST /resume) and got back `"approval_status": "approved"` with the full checkpointed state. This live run caught three real bugs, all fixed: langgraph-checkpoint-postgres needing psycopg[binary] (bare psycopg has no libpq in a minimal image), the Postgres checkpointer's connection being silently closed by garbage collection (the context-manager generator holding it open wasn't kept referenced), and orchestrator/requirements.txt missing fastapi/uvicorn entirely (caught earlier in containerization, same root cause: untested code path)
 
 ## Phase 8 — Observability & portfolio polish
-- [ ] Log full agent debate transcripts per gameweek to persistent storage
-- [ ] Build a small dashboard or report view for backtest results and ablations
-- [ ] (Optional) Wire up Microsoft Foundry's evaluation/observability dashboards for agent quality tracking
-- [ ] Record a demo (screen capture or GIF) of a live weekly run producing a recommendation, and of the frontend showing a played gameweek
-- [ ] Write up the project (README polish, architecture diagram, backtest results, ablation findings)
+- [x] Log full agent debate transcripts per gameweek to persistent storage -- already satisfied by the LangGraph Postgres checkpointer (orchestrator/run.py::postgres_checkpointer), verified for real: queried the `checkpoints` table after a live k8s run and confirmed the full first_round/reactions/manage_result state is actually persisted under the `live-gw<N>` thread id. No separate logging mechanism needed or built.
+- [x] Build a small dashboard or report view for backtest results and ablations -- frontend's "Season backtest" tab (frontend/src/components/SeasonResults.jsx), reading real data (frontend/public/data/season_2025_26.json, copied from backtest/results.json), verified rendering in a real browser
+- [ ] (Optional) Wire up Microsoft Foundry's evaluation/observability dashboards for agent quality tracking -- needs real Azure/Foundry resources this session doesn't have; left for whoever sets up the actual Foundry project (see TODO.md Phase 0)
+- [ ] Record a demo (screen capture or GIF) of a live weekly run producing a recommendation, and of the frontend showing a played gameweek -- a manual/human artifact (screen recording), not something producible in this session; the underlying live run and frontend rendering it would capture are both already verified for real (this session's k8s /run+/resume test, and the browser screenshots of the frontend)
+- [x] Write up the project (README polish, architecture diagram, backtest results, ablation findings) -- README.md's new "Backtest results" and "Status" sections, with the real numbers from this run
 
 ## Phase 9 — Stretch goals
 - [ ] Auto-apply mode against the real FPL account -- design already settled (GitHub Actions workflow triggered on PR merge, unofficial session-based login, dry-run period before a real submit); deliberately not built yet, revisit once recommend-and-confirm has run reliably over real gameweeks

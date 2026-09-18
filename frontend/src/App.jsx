@@ -1,18 +1,22 @@
 import { useEffect, useState } from "react";
 import SquadView from "./components/SquadView.jsx";
 import Transcript from "./components/Transcript.jsx";
+import SeasonResults from "./components/SeasonResults.jsx";
 
 // CLAUDE.md hard constraint: the frontend never talks to Postgres or any
-// backend, directly or indirectly - these two fetches (the index, then one
-// gameweek file) are the ONLY network calls this app ever makes, and both
-// are plain static files under public/data/, committed by frontend-export
-// (see that package's own README for how they get there).
+// backend, directly or indirectly - these fetches (the index, one
+// gameweek file, the season results file) are the ONLY network calls this
+// app ever makes, and all are plain static files under public/data/,
+// committed by frontend-export (see that package's own README for how
+// they get there).
 const DATA_BASE = `${import.meta.env.BASE_URL}data`;
 
 export default function App() {
+  const [view, setView] = useState("gameweeks");
   const [gameweeks, setGameweeks] = useState([]);
   const [selected, setSelected] = useState(null);
   const [record, setRecord] = useState(null);
+  const [season, setSeason] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -24,6 +28,11 @@ export default function App() {
         if (gws.length > 0) setSelected(gws[0].gameweek);
       })
       .catch((e) => setError(`Couldn't load the gameweek index: ${e.message}`));
+
+    fetch(`${DATA_BASE}/season_2025_26.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setSeason)
+      .catch(() => setSeason(null));
   }, []);
 
   useEffect(() => {
@@ -44,27 +53,44 @@ export default function App() {
 
       {error && <p className="error">{error}</p>}
 
-      {gameweeks.length > 0 && (
-        <nav className="gw-picker">
-          {gameweeks.map((gw) => (
-            <button
-              key={gw.gameweek}
-              className={gw.gameweek === selected ? "gw-btn active" : "gw-btn"}
-              onClick={() => setSelected(gw.gameweek)}
-            >
-              GW{gw.gameweek}
-              <span className={`badge badge-${gw.state}`}>{gw.state}</span>
-            </button>
-          ))}
-        </nav>
+      <nav className="view-tabs">
+        <button className={view === "gameweeks" ? "tab active" : "tab"} onClick={() => setView("gameweeks")}>
+          Gameweeks
+        </button>
+        {season && (
+          <button className={view === "season" ? "tab active" : "tab"} onClick={() => setView("season")}>
+            Season backtest
+          </button>
+        )}
+      </nav>
+
+      {view === "gameweeks" && (
+        <>
+          {gameweeks.length > 0 && (
+            <nav className="gw-picker">
+              {gameweeks.map((gw) => (
+                <button
+                  key={gw.gameweek}
+                  className={gw.gameweek === selected ? "gw-btn active" : "gw-btn"}
+                  onClick={() => setSelected(gw.gameweek)}
+                >
+                  GW{gw.gameweek}
+                  <span className={`badge badge-${gw.state}`}>{gw.state}</span>
+                </button>
+              ))}
+            </nav>
+          )}
+
+          {record && (
+            <main className="record">
+              <SquadView record={record} />
+              <Transcript transcript={record.transcript} />
+            </main>
+          )}
+        </>
       )}
 
-      {record && (
-        <main className="record">
-          <SquadView record={record} />
-          <Transcript transcript={record.transcript} />
-        </main>
-      )}
+      {view === "season" && <SeasonResults data={season} />}
     </div>
   );
 }

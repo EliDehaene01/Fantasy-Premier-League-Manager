@@ -42,9 +42,64 @@ Fantasy Premier League is a genuinely hard weekly optimization problem under unc
 - **Frontend**: React, deployed to GitHub Pages, reading only static exported JSON — no live backend
 - **Recommend-and-confirm**: no push notification — the weekly static export to GitHub Pages is the review surface
 
+## Backtest results
+
+Full 2025-26 season (GW2–38), walked forward with no lookahead, real trained
+model, real solver, real archive data — not illustrative numbers:
+
+| | Total points |
+|---|---|
+| This system | **2182** |
+| Never-transfer baseline | 1398 |
+| FPL average manager | not available (see `backtest/benchmarks.py` — no per-gameweek figure exists for a completed prior season, in the archive or the live API; not fabricated) |
+
+784 points ahead of the never-transfer baseline over the season — the
+transfer/chip machinery is doing real work, not just picking a good initial
+XI and coasting.
+
+**Per-agent ablations** (season rerun with one specialist removed at a
+time — the delta is what that agent was actually worth this season):
+
+| Agent | Delta |
+|---|---|
+| Chips | +86 |
+| Template | +63 |
+| Contrarian | +0 |
+| News | +0 (expected — contributes nothing during backtest, see below) |
+| Fixtures | −16 |
+
+Chips and Template contributed the most; Contrarian's signal existed but
+never actually swung a decision this particular season; Fixtures was
+mildly net-negative — a real, if counterintuitive, finding, reported
+honestly rather than smoothed over. See `backtest/results.json` for the
+full per-gameweek breakdown, and the frontend's "Season backtest" tab for
+the same data rendered.
+
+**News's backtest limitation, stated plainly**: it contributes nothing
+during backtest runs (empty recommendations/vetoes every gameweek) because
+`chance_of_playing_this_round` is a live, forward-looking field with no
+honest historical equivalent in the archive — deriving one from that
+gameweek's own outcome (e.g. inferring an injury from minutes actually
+played) would leak the result into what's supposed to be a pre-match
+signal. Live mode is unaffected; this is a backtest-only gap, documented
+in `data/backtest_seed.py`.
+
 ## Status
 
-Early planning stage — see [TODO.md](./TODO.md) for current progress and next steps.
+Solver, Manager, LangGraph orchestration, backtest engine (run for real
+over a full season, see above), containerization, and a working local
+Kubernetes deployment are built and verified — including a genuine
+end-to-end live run through the deployed cluster (all six specialist
+services, Manager, solver, the Postgres checkpointer, and the human-
+approval interrupt/resume cycle), not just unit tests. The frontend reads
+real exported gameweek and season data, verified rendering in an actual
+browser. See [TODO.md](./TODO.md) for the authoritative, itemized
+checklist — remaining open items are mainly Microsoft Foundry guardrail
+wiring (needs real Azure resources), the `frontend-export` Kubernetes Job
+(exists as a Python module, not yet wired into a CronJob-triggered
+pipeline), and actually publishing the frontend to GitHub Pages (a
+one-way, publicly-visible action left for an explicit decision rather than
+assumed).
 
 ## License
 
