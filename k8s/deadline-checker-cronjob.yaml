@@ -1,0 +1,30 @@
+# ARCHITECTURE.md 8: "runs daily, checks the FPL fixtures endpoint for the
+# next deadline; if it's within ~24-36 hours, triggers the pipeline Job."
+# The check-and-decide logic isn't built yet (Phase 5 scope is the
+# manifest/scheduling shell; the actual "is a deadline within 24-36h"
+# script is a small addition to ingestion/ once this phase's plumbing is
+# proven) - this CronJob currently runs the ingestion Job unconditionally
+# once a day, which is safe (ingestion is idempotent - every insert in
+# ingestion/db.py is ON CONFLICT DO UPDATE) but not yet the deadline-aware
+# trigger ARCHITECTURE.md describes. Documented as the honest current state
+# rather than a script that looks like it does the real check and doesn't.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: deadline-checker
+  namespace: fpl-agents
+spec:
+  schedule: "0 8 * * *"  # daily at 08:00 - FPL deadlines are irregular days, so this checks every day rather than assuming a fixed weekday
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ingestion
+              image: fpl-agents/ingestion:local
+              imagePullPolicy: Never
+              args: ["weekly"]
+              envFrom:
+                - secretRef: { name: fpl-secrets }

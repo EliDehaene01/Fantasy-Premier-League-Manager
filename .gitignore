@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Kubernetes - real secret values, filled in locally from k8s/secret.example.yaml
+k8s/secret.yaml

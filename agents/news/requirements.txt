@@ -15,6 +15,12 @@ pgvector==0.4.1           # psycopg2 adapter for the `vector` column type
 numpy==2.5.2
 scikit-learn==1.9.0
 joblib==1.6.0
+# severity_classifier.py imports agents.stats.data for its REPO_ROOT constant,
+# which pulls in pandas at module level even though this service never loads
+# the archive CSV itself - missing this only surfaces once News is actually
+# containerized in isolation (found while writing agents/news/Dockerfile;
+# the shared dev venv had it installed via agents/stats, masking the gap).
+pandas==3.0.5
 
 # --- tests ---
 pytest==9.1.1

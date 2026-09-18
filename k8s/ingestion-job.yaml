@@ -1,0 +1,22 @@
+# A Job, not a Deployment (ARCHITECTURE.md 8) - runs once to completion,
+# triggered by deadline-checker.yaml's CronJob. Not applied standalone in
+# normal operation (`kubectl create job --from=cronjob/deadline-checker`
+# is how a real run gets triggered) - included here as the template the
+# CronJob spawns from and for manual one-off runs during testing.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ingestion-weekly
+  namespace: fpl-agents
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: ingestion
+          image: fpl-agents/ingestion:local
+          imagePullPolicy: Never
+          args: ["weekly"]
+          envFrom:
+            - secretRef: { name: fpl-secrets }  # DATABASE_URL

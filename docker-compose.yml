@@ -1,0 +1,154 @@
+# Local multi-service dev stack (TODO.md Phase 4: "verify the orchestrator
+# can reach every specialist service before moving to Kubernetes"). All
+# *_DISABLE_LLM flags are set so this stack runs with zero real Foundry
+# calls/credentials - it verifies wiring and reachability, not model output
+# quality (that's what each agent's own test suite, and the backtest
+# engine's real-model run, already cover).
+#
+# frontend-export has no service here yet - it doesn't exist as code until
+# Phase 5a builds it (see CLAUDE.md's dependency order).
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_PASSWORD: MoveToLondon
+    ports:
+      # 5434, not 5433 - the local dev Postgres (fpl-postgres) already holds
+      # host:5433; compose services reach this one via the internal DNS name
+      # "postgres:5432" regardless, so this mapping is only for external
+      # debugging access and picking a free port avoids the clash.
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  solver:
+    build:
+      context: .
+      dockerfile: solver/Dockerfile
+    ports:
+      - "8001:8000"
+
+  stats:
+    build:
+      context: .
+      dockerfile: agents/stats/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:MoveToLondon@postgres:5432/postgres
+      STATS_AGENT_DISABLE_LLM: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8002:8000"
+
+  fixtures:
+    build:
+      context: .
+      dockerfile: agents/fixtures/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:MoveToLondon@postgres:5432/postgres
+      FIXTURES_AGENT_DISABLE_LLM: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8003:8000"
+
+  news:
+    build:
+      context: .
+      dockerfile: agents/news/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:MoveToLondon@postgres:5432/postgres
+      NEWS_AGENT_DISABLE_LLM: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8004:8000"
+
+  contrarian:
+    build:
+      context: .
+      dockerfile: agents/contrarian/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:MoveToLondon@postgres:5432/postgres
+      CONTRARIAN_AGENT_DISABLE_LLM: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8005:8000"
+
+  template:
+    build:
+      context: .
+      dockerfile: agents/template/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:MoveToLondon@postgres:5432/postgres
+      TEMPLATE_AGENT_DISABLE_LLM: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8006:8000"
+
+  chips:
+    build:
+      context: .
+      dockerfile: agents/chips/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:MoveToLondon@postgres:5432/postgres
+      CHIPS_AGENT_DISABLE_LLM: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8007:8000"
+
+  manager:
+    build:
+      context: .
+      dockerfile: manager/Dockerfile
+    environment:
+      MANAGER_NARRATE_DISABLE_LLM: "1"
+      MANAGER_REACT_DISABLE_LLM: "1"
+    ports:
+      - "8008:8000"
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: orchestrator/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:MoveToLondon@postgres:5432/postgres
+      STATS_AGENT_URL: http://stats:8000
+      FIXTURES_AGENT_URL: http://fixtures:8000
+      NEWS_AGENT_URL: http://news:8000
+      CONTRARIAN_AGENT_URL: http://contrarian:8000
+      TEMPLATE_AGENT_URL: http://template:8000
+      CHIPS_AGENT_URL: http://chips:8000
+      MANAGER_URL: http://manager:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      stats:
+        condition: service_started
+      fixtures:
+        condition: service_started
+      news:
+        condition: service_started
+      contrarian:
+        condition: service_started
+      template:
+        condition: service_started
+      chips:
+        condition: service_started
+      manager:
+        condition: service_started
+    ports:
+      - "8000:8000"

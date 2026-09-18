@@ -89,18 +89,18 @@
 - [x] Test a full backtest gameweek and a full local "live" dry run end-to-end (fake service callers standing in for live HTTP/Postgres -- Phase 4 containerization hasn't happened yet, so a true multi-service integration run isn't possible until then)
 
 ## Phase 4 — Containerization
-- [ ] Write a Dockerfile per specialist service (stats, fixtures, news, contrarian, template, chips, manager, solver, ingestion, frontend-export, orchestrator)
-- [ ] Local `docker compose` setup to verify the orchestrator can reach every specialist service before moving to Kubernetes
+- [x] Write a Dockerfile per specialist service (stats, fixtures, news, contrarian, template, chips, manager, solver, ingestion, orchestrator) -- frontend-export deferred, see Phase 5a note below; it doesn't exist as code yet
+- [x] Local `docker compose` setup to verify the orchestrator can reach every specialist service before moving to Kubernetes -- verified for real (not just built): brought the stack up from a genuinely fresh Postgres twice, all 9 services reachable and DB-connected, orchestrator reaching every one over the compose network
 
 ## Phase 5 — Kubernetes deployment
-- [ ] Create the `fpl-agents` namespace and base manifests, on local Docker Desktop Kubernetes (not a cloud cluster -- deliberate cost/portfolio-value decision, see ARCHITECTURE.md 8b)
-- [ ] Deploy the `orchestrator` (Deployment + Service)
-- [ ] Deploy each specialist service (Deployment or Job, depending on lifecycle)
-- [ ] Set up ConfigMaps/Secrets for Microsoft Foundry endpoint/keys and other config
-- [ ] Decide and document whether Postgres runs inside the Kubernetes namespace or stays as the external local container already in use -- either is fine, but pick one deliberately rather than leaving it ambiguous
-- [ ] Write the `deadline-checker` CronJob and the `ingestion` Job
-- [ ] Write the `frontend-export` Job: exports pending-approval and final-state JSON per gameweek, commits/pushes to the frontend repo
-- [ ] Set up Windows Task Scheduler's "wake this computer" option so the local CronJob actually fires if the machine is asleep -- test this once, don't assume it works
+- [x] Create the `fpl-agents` namespace and base manifests, on local Docker Desktop Kubernetes (not a cloud cluster -- deliberate cost/portfolio-value decision, see ARCHITECTURE.md 8b)
+- [x] Deploy the `orchestrator` (Deployment + Service) -- gave it an actual HTTP trigger surface (orchestrator/service.py: POST /run, POST /resume) since ARCHITECTURE.md 8 calls it a persistent Deployment, not a one-shot script
+- [x] Deploy each specialist service (Deployment or Job, depending on lifecycle) -- all 9 Deployments applied and verified Running (1/1) on the real local cluster; ingestion is a Job, not a Deployment
+- [x] Set up ConfigMaps/Secrets for Microsoft Foundry endpoint/keys and other config (k8s/configmap.yaml, k8s/secret.example.yaml -- real values stay local-only, gitignored)
+- [x] Decide and document whether Postgres runs inside the Kubernetes namespace or stays as the external local container already in use -- external, deliberately (k8s/postgres-external.yaml has the full reasoning); verified pods actually reach it via `host.docker.internal` (every DB-backed service showed `db_connected: true` from inside the cluster)
+- [x] Write the `deadline-checker` CronJob and the `ingestion` Job -- CronJob currently runs `ingestion weekly` unconditionally daily rather than the real "deadline within 24-36h" check, which isn't built yet; documented as an honest known gap in k8s/README.md, not hidden
+- [ ] Write the `frontend-export` Job: exports pending-approval and final-state JSON per gameweek, commits/pushes to the frontend repo -- blocked on Phase 5a existing first (this session's explicit dependency order: containerization -> Kubernetes -> frontend -> HITL)
+- [ ] Set up Windows Task Scheduler's "wake this computer" option so the local CronJob actually fires if the machine is asleep -- a one-time manual OS configuration step, not something this repo's code can do; left open, documented in k8s/README.md
 
 ## Phase 5a — Frontend
 - [ ] Scaffold a React app, deployed to GitHub Pages

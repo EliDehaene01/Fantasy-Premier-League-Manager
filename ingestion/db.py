@@ -323,6 +323,16 @@ def get_connection(dsn: str | None = None, *, schema: str | None = None) -> Conn
     Safe to call repeatedly - schema/table creation is idempotent (``IF NOT
     EXISTS`` everywhere), matching the idempotency the rest of this layer
     promises for the weekly CronJob.
+
+    Also safe to call CONCURRENTLY (e.g. several services' containers all
+    starting at once against a brand-new, empty database - found via a
+    genuine docker-compose-up-from-scratch run, not something the long-
+    lived local dev Postgres ever exercised): Postgres's own "IF NOT
+    EXISTS" only checks-then-creates, which is NOT atomic across sessions -
+    two connections can both see "doesn't exist yet" and both try to
+    create it, raising a UniqueViolation on pg_type. The advisory lock
+    below serializes just the schema-creation step across connections so
+    concurrent startups queue instead of racing.
     """
     dsn = dsn or os.environ["DATABASE_URL"]
     conn = psycopg2.connect(
@@ -334,6 +344,18 @@ def get_connection(dsn: str | None = None, *, schema: str | None = None) -> Conn
             cur.execute(pgsql.SQL("SET search_path TO {}").format(pgsql.Identifier(schema)))
         conn.commit()
     with conn.cursor() as cur:
-        cur.execute(_SCHEMA)
-    conn.commit()
+        # Arbitrary constant, just needs to be the same across every caller -
+        # this lock has no meaning beyond "one schema-creation at a time".
+        # The commit MUST happen before the unlock, not after - releasing
+        # the lock first would let the next waiting session start checking
+        # "IF NOT EXISTS" against this transaction's NOT-YET-committed
+        # changes, racing all over again just with a narrower window
+        # (caught by testing this fix against a truly fresh database
+        # instead of trusting the lock alone to be correct).
+        cur.execute("SELECT pg_advisory_lock(727100)")
+        try:
+            cur.execute(_SCHEMA)
+            conn.commit()
+        finally:
+            cur.execute("SELECT pg_advisory_unlock(727100)")
     return conn

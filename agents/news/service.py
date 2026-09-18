@@ -37,17 +37,29 @@ log = logging.getLogger("news_agent")
 async def lifespan(app: FastAPI):
     app.state.db_conn = None
     try:
-        from ingestion.db import get_connection, register_pgvector_adapter
+        from ingestion.db import ensure_pgvector_schema, get_connection
 
         conn = get_connection()
-        register_pgvector_adapter(conn)
-        app.state.db_conn = conn
+        # ensure_pgvector_schema runs `CREATE EXTENSION IF NOT EXISTS vector`
+        # itself (then the vector-backed tables, then registers the adapter)
+        # rather than assuming the extension already exists - a fresh
+        # Postgres instance (e.g. a from-scratch docker-compose/k8s run)
+        # never has it pre-installed, only a long-lived dev database that
+        # happened to get it set up manually once. Previously this called
+        # register_pgvector_adapter directly, which requires the extension
+        # to already be there and silently fell back to Tier-1-only forever
+        # on a fresh database instead of self-healing.
+        if ensure_pgvector_schema(conn):
+            app.state.db_conn = conn
+        else:
+            log.warning("News agent: pgvector extension unavailable on this Postgres instance - Tier 2 will fall back")
+            conn.close()
     except Exception:
-        # No DB, or pgvector not installed yet - Tier 1 still works fully
-        # (it never touches the database); only Tier 2 degrades, and it
-        # already has its own per-call fallback (see tier2.py) for exactly
-        # this situation, so a missing vector store doesn't break /argue.
-        log.warning("News agent: Postgres/pgvector unavailable at startup - Tier 2 will fall back", exc_info=True)
+        # No DB at all - Tier 1 still works fully (it never touches the
+        # database); only Tier 2 degrades, and it already has its own
+        # per-call fallback (see tier2.py) for exactly this situation, so a
+        # missing vector store doesn't break /argue.
+        log.warning("News agent: Postgres unavailable at startup - Tier 2 will fall back", exc_info=True)
     yield
     if app.state.db_conn is not None:
         app.state.db_conn.close()
