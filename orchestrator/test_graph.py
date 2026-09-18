@@ -119,6 +119,88 @@ def test_chips_agent_recommendation_drives_the_active_chip():
     assert captured["chip"] == ChipType.WILDCARD
 
 
+def _transfer_scenario_pool():
+    """15 mediocre "current squad" players plus 15 clearly-better
+    alternatives, each at a distinct club - enough surplus/contrast that
+    the solver would want to replace most of the old squad if it could
+    afford to, but adopting more than one of them costs a hit under a
+    normal 1-free-transfer week.
+    """
+    pool, pid, club = [], 1, 1
+    for position, count in [("GK", 2), ("DEF", 5), ("MID", 5), ("FWD", 3)]:
+        for _ in range(count):
+            pool.append({"player_id": pid, "club_id": club, "position": position, "price": 4.5, "in_current_squad": True})
+            pid += 1
+            club += 1
+    for position, count in [("GK", 2), ("DEF", 5), ("MID", 5), ("FWD", 3)]:
+        for _ in range(count):
+            pool.append({"player_id": pid, "club_id": club, "position": position, "price": 4.5})
+            pid += 1
+            club += 1
+    return pool
+
+
+def _fake_specialist_with_dominant_new_squad(chip_recommendation):
+    old_ids = {p["player_id"] for p in _transfer_scenario_pool() if p.get("in_current_squad")}
+
+    def fake_specialist(agent_name, gameweek, player_pool):
+        if agent_name == "stats":
+            recs = [
+                Recommendation(player_id=p["player_id"], conviction=1.0, predicted_points=(1.0 if p["player_id"] in old_ids else 20.0))
+                for p in player_pool
+            ]
+            return AgentArgument(agent="stats", recommendations=recs, reasoning="model output")
+        if agent_name == "chips" and chip_recommendation is not None:
+            return AgentArgument(
+                agent="chips",
+                chip_recommendation=ChipRecommendation(chip=chip_recommendation, confidence=1.0, reasoning="fixture swing justifies it"),
+                reasoning="fixture swing justifies it",
+            )
+        return AgentArgument(agent=agent_name, reasoning=f"{agent_name} has no strong opinion this week")
+
+    return fake_specialist
+
+
+def test_managers_final_squad_actually_reflects_the_chip_not_just_the_request_field():
+    """Distinguishes "the chip value was passed to Manager" (the earlier
+    bug - Manager wasn't even receiving it) from "the chip changed
+    Manager's actual decision" (what the fix needs to be worth anything).
+    Same dominant-alternative-squad scenario run twice, chip vs. no chip -
+    only the Wildcard run may take zero-cost transfers beyond the free
+    allowance; the no-chip control run, facing the identical incentive to
+    replace the whole squad, must NOT get them for free.
+    """
+    state = {**_base_state("backtest"), "player_pool": _transfer_scenario_pool(), "free_transfers": 1}
+
+    wildcard_app = build_graph(
+        agent_caller=_fake_specialist_with_dominant_new_squad(ChipType.WILDCARD),
+        manage_caller=_fake_manage, react_caller=_fake_react, checkpointer=InMemorySaver(),
+    )
+    wildcard_result = wildcard_app.invoke(state, config={"configurable": {"thread_id": "chip-final-a"}})
+
+    no_chip_app = build_graph(
+        agent_caller=_fake_specialist_with_dominant_new_squad(None),
+        manage_caller=_fake_manage, react_caller=_fake_react, checkpointer=InMemorySaver(),
+    )
+    no_chip_result = no_chip_app.invoke(state, config={"configurable": {"thread_id": "chip-final-b"}})
+
+    wildcard_manage = wildcard_result["manage_result"]
+    no_chip_manage = no_chip_result["manage_result"]
+    assert wildcard_manage["feasible"] and no_chip_manage["feasible"]
+
+    # The actual, final decision - not a request field - proves the chip
+    # took effect: many transfers, zero hit cost, only under Wildcard.
+    assert wildcard_manage["transfers_made"] > 1
+    assert wildcard_manage["hits_taken"] == 0
+    assert wildcard_manage["hit_points_cost"] == 0.0
+
+    # Same incentive, no chip: the solver may still take one free transfer,
+    # but reaching for more of the dominant squad must cost a hit or simply
+    # not happen - it cannot ALSO end up hits_taken == 0 with more than one
+    # transfer, or the chip made no real difference to the outcome.
+    assert not (no_chip_manage["transfers_made"] > 1 and no_chip_manage["hits_taken"] == 0)
+
+
 def test_backtest_mode_auto_accepts_without_pausing():
     app = build_graph(agent_caller=_fake_specialist_factory(), manage_caller=_fake_manage, react_caller=_fake_react, checkpointer=InMemorySaver())
     result = app.invoke(_base_state("backtest"), config={"configurable": {"thread_id": "t3"}})
