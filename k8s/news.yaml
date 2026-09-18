@@ -21,7 +21,7 @@ spec:
             - secretRef: { name: fpl-secrets }
           env:
             - name: NEWS_AGENT_DISABLE_LLM
-              value: "1"  # flip to "0" once real Foundry credentials are in secret.yaml
+              value: "0"  # real Foundry/Content Safety credentials are in secret.yaml - see docs/foundry_guardrails.md
           readinessProbe:
             httpGet: { path: /health, port: 8000 }
             initialDelaySeconds: 5
