@@ -71,12 +71,12 @@
 - [x] Build the bounded reaction round: each agent sees all first-round outputs, writes a text-only reaction that cannot alter conviction/recommendations/vetoes
 
 ## Phase 2 — Backtest engine
-- [ ] Implement state tracking (squad, bank, free transfers, chips used) across gameweeks
-- [ ] Implement the walk-forward loop with strict no-lookahead data slicing
-- [ ] Stub/skip guardrail calls during backtest (no real external text, avoid unnecessary cost)
-- [ ] Implement scoring against actual historical results, including transfer-hit and chip effects
-- [ ] Implement benchmark comparisons (FPL average manager score, "never transfer" baseline)
-- [ ] Implement per-agent ablation runs
+- [x] Implement state tracking (squad, bank, free transfers, chips used) across gameweeks
+- [x] Implement the walk-forward loop with strict no-lookahead data slicing
+- [x] Stub/skip guardrail calls during backtest (no real external text, avoid unnecessary cost) -- extended to all reasoning/narration LLM calls too (backtest/agents_bridge.py::disable_all_llm_calls), not just guardrails; only the deterministic scoring/solving logic runs for real
+- [x] Implement scoring against actual historical results, including transfer-hit and chip effects
+- [x] Implement benchmark comparisons -- "never transfer" baseline implemented for real; FPL average-manager score is honestly unavailable for a completed season (checked the actual archive file listing -- no such file; the live API only serves the currently active season), documented in backtest/benchmarks.py rather than faked
+- [x] Implement per-agent ablation runs (backtest/engine.py::run_ablations)
 - [ ] Run a full-season backtest and write up results
 
 ## Phase 3 — Orchestration (LangGraph)

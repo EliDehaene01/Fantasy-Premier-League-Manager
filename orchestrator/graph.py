@@ -79,6 +79,24 @@ def _make_reaction_node(react_caller):
     return node
 
 
+def _effective_chip(state: GraphState) -> str | None:
+    """The active chip for this gameweek is driven by the Chips agent's own
+    recommendation (ARCHITECTURE.md 6a: "a Wildcard or Free Hit week (driven
+    by the Chips agent's recommendation)"), not an independently pre-set
+    state value. ``state.get("chip")`` is only a fallback for when the Chips
+    agent's output isn't in ``first_round`` at all (e.g. an ablation run
+    with Chips removed) - "missing opinions default to zero adjustment"'s
+    spirit applied here too: no chip, not a guess.
+    """
+    chips_raw = state["first_round"].get("chips")
+    if chips_raw is None:
+        return state.get("chip")
+    chips_arg = AgentArgument.model_validate(chips_raw)
+    if chips_arg.chip_recommendation is None or chips_arg.chip_recommendation.chip is None:
+        return None
+    return chips_arg.chip_recommendation.chip.value
+
+
 def _make_manager_node(manage_caller):
     def node(state: GraphState) -> dict:
         stats_raw = state["first_round"].get("stats")
@@ -91,18 +109,23 @@ def _make_manager_node(manage_caller):
             for name in ADJUSTMENT_AGENTS
             if name in state["first_round"]
         }
+        effective_chip = _effective_chip(state)
         request = ManageRequest(
             gameweek=state["gameweek"],
             budget=state.get("budget", 100.0),
             free_transfers=state.get("free_transfers", 1),
             hit_cost=state.get("hit_cost", 4.0),
-            chip=state.get("chip"),
+            chip=effective_chip,
             player_pool=[ManagerPlayerFact.model_validate(p) for p in state["player_pool"]],
             stats=stats,
             adjustments=adjustments,
         )
         result = manage_caller(request)
-        return {"manage_result": result.model_dump(mode="json")}
+        # Overwrite state["chip"] with what was actually used (derived from
+        # the Chips agent, not whatever the caller pre-set) - ManageResult
+        # itself doesn't carry this, and the backtest engine's scoring
+        # needs to know which chip effect (if any) to apply.
+        return {"manage_result": result.model_dump(mode="json"), "chip": effective_chip}
 
     return node
 

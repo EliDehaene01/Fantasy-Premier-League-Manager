@@ -22,7 +22,7 @@ from langgraph.types import Command
 from manager.schemas import ManageRequest, ManageResult
 from manager.service import manage
 from orchestrator.graph import SPECIALIST_AGENTS, build_graph
-from shared.contracts import AgentArgument, Recommendation, Veto, VetoStatus
+from shared.contracts import AgentArgument, ChipRecommendation, ChipType, Recommendation, Veto, VetoStatus
 
 CANDIDATE_SHAPE = [("GK", 3), ("DEF", 6), ("MID", 6), ("FWD", 4)]  # surplus over the required 2/5/5/3
 
@@ -37,7 +37,7 @@ def _pool():
     return pool
 
 
-def _fake_specialist_factory(veto_player_id=None):
+def _fake_specialist_factory(veto_player_id=None, chip_recommendation=None):
     def fake_specialist(agent_name, gameweek, player_pool):
         if agent_name == "stats":
             recs, score = [], 4.0
@@ -47,6 +47,12 @@ def _fake_specialist_factory(veto_player_id=None):
             return AgentArgument(agent="stats", recommendations=recs, reasoning="model output")
         if agent_name == "news" and veto_player_id is not None:
             return AgentArgument(agent="news", vetoes=[Veto(player_id=veto_player_id, status=VetoStatus.OUT, confidence=1.0)], reasoning="ruled out")
+        if agent_name == "chips" and chip_recommendation is not None:
+            return AgentArgument(
+                agent="chips",
+                chip_recommendation=ChipRecommendation(chip=chip_recommendation, confidence=1.0, reasoning="double gameweek ahead"),
+                reasoning="double gameweek ahead",
+            )
         return AgentArgument(agent=agent_name, reasoning=f"{agent_name} has no strong opinion this week")
 
     return fake_specialist
@@ -88,6 +94,29 @@ def test_news_veto_propagates_end_to_end_through_the_graph():
     assert result["manage_result"]["feasible"] is True
     squad_ids = {s["player_id"] for s in result["manage_result"]["squad"]}
     assert best_id not in squad_ids
+
+
+def test_chips_agent_recommendation_drives_the_active_chip():
+    """ARCHITECTURE.md 6a: chip-aware solving is "driven by the Chips
+    agent's recommendation" - not a value the caller pre-sets independently
+    of what Chips actually argued for this gameweek.
+    """
+    captured = {}
+
+    def capturing_manage(request):
+        captured["chip"] = request.chip
+        return _fake_manage(request)
+
+    app = build_graph(
+        agent_caller=_fake_specialist_factory(chip_recommendation=ChipType.WILDCARD),
+        manage_caller=capturing_manage, react_caller=_fake_react, checkpointer=InMemorySaver(),
+    )
+    # Deliberately do NOT set state["chip"] - it must come from the Chips
+    # agent's first-round output, not a pre-set field.
+    result = app.invoke(_base_state("backtest"), config={"configurable": {"thread_id": "t7"}})
+
+    assert result["manage_result"]["feasible"] is True
+    assert captured["chip"] == ChipType.WILDCARD
 
 
 def test_backtest_mode_auto_accepts_without_pausing():
