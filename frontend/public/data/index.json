@@ -1,0 +1,12 @@
+{
+  "gameweeks": [
+    {
+      "gameweek": 9,
+      "state": "final"
+    },
+    {
+      "gameweek": 10,
+      "state": "pending"
+    }
+  ]
+}

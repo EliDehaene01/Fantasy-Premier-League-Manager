@@ -1,0 +1,77 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #2a2f3a;
+  --text: #e8eaed;
+  --muted: #9aa2af;
+  --accent: #5b8def;
+  --good: #3ecf8e;
+  --bad: #e5534b;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+.app { max-width: 900px; margin: 0 auto; padding: 24px 16px 64px; }
+
+.app-header h1 { margin-bottom: 0; }
+.subtitle { color: var(--muted); margin-top: 4px; }
+
+.error { color: var(--bad); }
+
+.gw-picker { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+.gw-btn {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gw-btn.active { border-color: var(--accent); }
+
+.badge {
+  font-size: 0.7em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.badge-pending { background: #3a3010; color: #e3b341; }
+.badge-final { background: #0f2e22; color: var(--good); }
+
+.squad-view, .transcript { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+
+.gw-summary h2 { display: flex; align-items: center; gap: 10px; margin-top: 0; }
+.points-total { font-size: 1.1em; }
+.narration { color: var(--muted); font-style: italic; }
+
+.squad-lists { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 560px) { .squad-lists { grid-template-columns: 1fr; } }
+
+.squad-lists h3 { font-size: 0.9em; text-transform: uppercase; color: var(--muted); }
+.squad-lists ul { list-style: none; padding: 0; margin: 0; }
+.player { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.player.bench { color: var(--muted); }
+.armband { font-weight: 700; color: var(--accent); }
+.player-points { font-variant-numeric: tabular-nums; }
+
+.transcript-entry { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+.transcript-entry:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.transcript-entry h4 { margin-bottom: 4px; }
+.reasoning { margin: 4px 0; }
+.rec-list ul { margin: 4px 0 8px 20px; padding: 0; }
+.rec-veto { color: var(--bad); }
+.chip-rec { color: var(--accent); }
+.reaction { color: var(--muted); font-style: italic; margin-top: 6px; }

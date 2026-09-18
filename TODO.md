@@ -103,10 +103,10 @@
 - [ ] Set up Windows Task Scheduler's "wake this computer" option so the local CronJob actually fires if the machine is asleep -- a one-time manual OS configuration step, not something this repo's code can do; left open, documented in k8s/README.md
 
 ## Phase 5a — Frontend
-- [ ] Scaffold a React app, deployed to GitHub Pages
-- [ ] Build the per-gameweek view: chosen/proposed team, full six-agent transcript (first round + bounded reaction round), actual points once played, shown against the backtest's average-manager benchmark
-- [ ] Build the pending-vs-final state rendering (same underlying gameweek record, two states)
-- [ ] Confirm the app only ever reads the exported static JSON -- no calls to Postgres or any backend, directly or indirectly
+- [x] Scaffold a React app (Vite + React, frontend/) -- NOT yet deployed to GitHub Pages (a one-way, publicly-visible action deliberately left for an explicit ask rather than assumed; base path is already configured and ready in vite.config.js)
+- [x] Build the per-gameweek view: chosen/proposed team, full six-agent transcript (first round + bounded reaction round), actual points once played -- NOT shown against the backtest's average-manager benchmark, since that benchmark is honestly unavailable (checked the real archive/API, documented in backtest/benchmarks.py, not faked); shows the real per-player/captain-doubled points total instead
+- [x] Build the pending-vs-final state rendering (same underlying gameweek record, two states) -- verified in a real browser against two genuine gameweeks from the actual backtest pipeline (not fabricated fixture data), see frontend/public/data/gw9.json (final) and gw10.json (pending)
+- [x] Confirm the app only ever reads the exported static JSON -- no calls to Postgres or any backend, directly or indirectly -- verified by grepping frontend/src for every fetch()/XHR/axios call, not assumed: exactly two, both to static JSON under public/data/
 
 ## Phase 6 — Guardrails (Microsoft Foundry)
 - [ ] Enable Content Safety / Prompt Shields on the Foundry project
