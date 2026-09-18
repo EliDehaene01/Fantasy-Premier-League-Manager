@@ -132,6 +132,25 @@ def run_season(season: str = "2025-26", start_gw: int = DEFAULT_START_GW, end_gw
         if len(pool) < MIN_CANDIDATES:
             continue  # e.g. a gameweek past the archive's coverage - skip rather than crash
 
+        # Log Stats' prediction for THIS gameweek BEFORE the parallel
+        # specialist round runs, not after. Contrarian and Chips both read
+        # predictions_log with an exact `WHERE gw = %s` match, by design
+        # (ARCHITECTURE.md 3: Contrarian "reading from the Stats predictions
+        # log rather than a live call") - logging AFTER the graph completes
+        # meant a truly fresh run could never find that gameweek's own row
+        # (it didn't exist yet), while any LATER run sharing the same seeded
+        # schema silently benefited from an EARLIER run's leftover rows -
+        # a confound that made ablation comparisons meaningless (the first
+        # run in any sequence always had Contrarian/Chips going in blind,
+        # every run after it didn't). Pre-logging makes every run, in any
+        # position in a sequence, see the same data availability. Stats runs
+        # twice per gameweek as a result (here, and again inside the graph's
+        # own parallel round) - redundant but deterministic and cheap next
+        # to the alternative of a confounded ablation study.
+        stats_arg = bridge("stats", gw, pool)
+        log_predictions(conn, gw, stats_arg, stats_model.model_version)
+        conn.commit()
+
         squad_value = sum(_latest_prices(conn, gw, list(state.squad)).values())
         initial_state = {
             "player_pool": pool,
@@ -140,11 +159,6 @@ def run_season(season: str = "2025-26", start_gw: int = DEFAULT_START_GW, end_gw
             "hit_cost": 4.0,
         }
         result_state = run_backtest_gameweek(gw, initial_state, graph=graph)
-
-        stats_raw = result_state["first_round"].get("stats")
-        if stats_raw is not None:
-            log_predictions(conn, gw, AgentArgument.model_validate(stats_raw), stats_model.model_version)
-        conn.commit()
 
         manage_result_dict = result_state["manage_result"]
         report.gameweeks.append(gw)
