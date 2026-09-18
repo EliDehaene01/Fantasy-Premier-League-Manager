@@ -25,12 +25,27 @@ def postgres_checkpointer():
     Import kept local to this function - langgraph.checkpoint.postgres pulls
     in psycopg, which callers that only need the in-memory test path
     shouldn't have to have installed.
+
+    ``PostgresSaver.from_conn_string`` is a ``@contextmanager`` wrapping
+    ``with Connection.connect(...) as conn: yield cls(conn)`` - the
+    connection is only kept open for as long as that generator's frame is
+    alive. Calling ``.__enter__()`` manually (instead of a ``with`` block)
+    advances it to the yield and returns the checkpointer, but if the
+    generator object itself (``checkpointer_cm`` below) isn't kept
+    referenced somewhere, it gets garbage-collected once this function
+    returns - which closes the connection via ``GeneratorExit``, so the
+    very next real query fails with "the connection is closed" (caught by
+    actually calling this against the live k8s deployment; every test
+    before that used InMemorySaver and never exercised this path at all).
+    Stashing it as an attribute keeps it alive exactly as long as the
+    checkpointer object itself is.
     """
     from langgraph.checkpoint.postgres import PostgresSaver
 
     checkpointer_cm = PostgresSaver.from_conn_string(os.environ[DATABASE_URL_ENV])
     checkpointer = checkpointer_cm.__enter__()
     checkpointer.setup()
+    checkpointer._conn_string_cm = checkpointer_cm  # keep the generator (and its connection) alive
     return checkpointer
 
 

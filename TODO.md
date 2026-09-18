@@ -116,9 +116,9 @@
 - [ ] (Optional) Add groundedness detection on the News agent's summaries
 
 ## Phase 7 — Human-in-the-loop recommend & confirm
-- [ ] Confirm the exported JSON (Phase 5a) carries everything needed for review: transfers, captain, chip call, full transcript -- this is the recommendation format, there's no separate notification message to design
-- [ ] Document the manual apply step (how you take the recommendation and apply it in the real FPL team)
-- [ ] (Stretch) Add a lightweight approve/reject action that resumes the LangGraph interrupt and logs the decision
+- [x] Confirm the exported JSON (Phase 5a) carries everything needed for review: transfers, captain, chip call, full transcript -- verified against a real gameweek run through the live k8s orchestrator (not a fixture), see docs/human_in_the_loop.md
+- [x] Document the manual apply step (how you take the recommendation and apply it in the real FPL team) -- docs/human_in_the_loop.md
+- [x] (Stretch) Add a lightweight approve/reject action that resumes the LangGraph interrupt and logs the decision -- scripts/approve_gameweek.py, run for real against the live k8s deployment: triggered a real gameweek (POST /run, paused at the interrupt with a genuine feasible squad from all six live specialist services), then resumed it (POST /resume) and got back `"approval_status": "approved"` with the full checkpointed state. This live run caught three real bugs, all fixed: langgraph-checkpoint-postgres needing psycopg[binary] (bare psycopg has no libpq in a minimal image), the Postgres checkpointer's connection being silently closed by garbage collection (the context-manager generator holding it open wasn't kept referenced), and orchestrator/requirements.txt missing fastapi/uvicorn entirely (caught earlier in containerization, same root cause: untested code path)
 
 ## Phase 8 — Observability & portfolio polish
 - [ ] Log full agent debate transcripts per gameweek to persistent storage

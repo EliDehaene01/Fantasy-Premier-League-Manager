@@ -4,6 +4,16 @@ fastapi==0.141.1
 uvicorn[standard]==0.52.4
 langgraph==1.2.11
 langgraph-checkpoint-postgres==3.1.2
+# langgraph-checkpoint-postgres depends on bare `psycopg`, which needs
+# either a compiled C extension or the system libpq library present at
+# runtime - neither exists in a minimal python:3.14-slim image (found by
+# actually calling postgres_checkpointer() against the real k8s deployment;
+# every test before that used InMemorySaver instead, so this path had never
+# really been exercised). psycopg[binary] bundles its own libpq, working
+# identically in the container and in dev - this machine's psycopg only
+# "worked" locally by incidentally finding libpq.dll on PATH from a native
+# PostgreSQL install, not because the dependency was actually satisfied.
+psycopg[binary]==3.3.5
 httpx==0.28.1
 
 # --- tests ---
