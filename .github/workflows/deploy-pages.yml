@@ -1,0 +1,55 @@
+# Publishes frontend/ (built with the static JSON frontend-export already
+# wrote into frontend/public/data/) to GitHub Pages.
+#
+# NOT wired to run automatically yet: the trigger below is workflow_dispatch
+# only (manual "Run workflow" button), not `push`. This is intentional -
+# CLAUDE.md/ARCHITECTURE.md treat "the site goes live" as a deliberate,
+# separate decision, not something that happens as a side effect of
+# committing frontend-export's output. Flip the `on:` block to include
+# `push: { branches: [main], paths: ["frontend/**"] }` only once that
+# decision has actually been made, and GitHub Pages has been enabled for
+# this repo (Settings -> Pages -> Source: GitHub Actions) - until Pages is
+# enabled there, `deploy-pages` has nothing to publish to regardless of
+# what triggers this file.
+name: Deploy frontend to GitHub Pages
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
