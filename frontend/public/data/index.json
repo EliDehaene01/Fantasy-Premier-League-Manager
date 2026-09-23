@@ -7,6 +7,14 @@
     {
       "gameweek": 10,
       "state": "pending"
+    },
+    {
+      "gameweek": 11,
+      "state": "final"
+    },
+    {
+      "gameweek": 12,
+      "state": "pending"
     }
   ]
 }
