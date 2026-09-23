@@ -1,5 +1,7 @@
 # FPL multi-agent manager
 
+**Live**: [elidehaene01.github.io/Fantasy-Premier-League-Manager](https://elidehaene01.github.io/Fantasy-Premier-League-Manager/)
+
 A multi-agent AI system that manages a real Fantasy Premier League (FPL) squad. A set of specialist agents — orchestrated as a **LangGraph** state machine, each running as its own containerized service — debate transfers, captaincy and chip strategy every gameweek, weighing form, fixtures, injuries, ownership and squad rules before a manager agent finalizes a recommendation for a human to approve.
 
 This is a project built to demonstrate practical skills with agentic AI frameworks, multi-service system design, and production-style deployment (Docker + Docker Compose) — not just a single LLM calling tools in a loop.
@@ -86,6 +88,15 @@ in `data/backtest_seed.py`.
 
 ## Status
 
+**Live.** The site above is published and serving real data: gameweeks 1–5
+are real account history (backfilled from the official FPL API, marked as
+manual selections since the agent system wasn't running yet), and the
+agent system is now tracking the real squad week to week — the most recent
+gameweek's proposal (real current squad, real bank, real free-transfer
+count, all six specialists' real debate, Manager, solver) is sitting at
+the human-approval step right now, under review before anything gets
+applied to the real team.
+
 Solver, Manager, LangGraph orchestration, backtest engine (run for real
 over a full season, see above), containerization, and a working local
 Docker Compose deployment are built and verified — all ten services
@@ -97,16 +108,13 @@ also built and deployed successfully for several hours against real data,
 but was abandoned in favor of Compose after a Docker Desktop kind-mode
 image-visibility limitation on the development machine couldn't be
 resolved (see ARCHITECTURE.md 8b and TODO.md for the full record — kept
-as an honest account of what was tried, not erased). The frontend reads
-real exported gameweek and season data, verified rendering in an actual
-browser. See [TODO.md](./TODO.md) for the authoritative, itemized
-checklist — remaining open items are mainly Microsoft Foundry guardrail
-wiring for the agents other than News (needs real Azure resources), the
-`frontend-export` step (exists as a Python module, not yet wired into the
-scheduled weekly pipeline), and actually publishing the frontend to
-GitHub Pages (a one-way, publicly-visible action left for an explicit
-decision rather than assumed).
+as an honest account of what was tried, not erased). See [TODO.md](./TODO.md)
+for the authoritative, itemized checklist — remaining open items are
+mainly Microsoft Foundry guardrail wiring for the agents other than News
+(needs real Azure resources) and deriving the real free-transfer count
+from account data instead of a hardcoded default (currently verified
+correct by hand each week, not yet computed automatically).
 
 ## License
 
-TBD.
+[MIT](./LICENSE)
