@@ -1,19 +1,20 @@
 # Publishes frontend/ (built with the static JSON frontend-export already
 # wrote into frontend/public/data/) to GitHub Pages.
 #
-# NOT wired to run automatically yet: the trigger below is workflow_dispatch
-# only (manual "Run workflow" button), not `push`. This is intentional -
-# CLAUDE.md/ARCHITECTURE.md treat "the site goes live" as a deliberate,
-# separate decision, not something that happens as a side effect of
-# committing frontend-export's output. Flip the `on:` block to include
-# `push: { branches: [main], paths: ["frontend/**"] }` only once that
-# decision has actually been made, and GitHub Pages has been enabled for
-# this repo (Settings -> Pages -> Source: GitHub Actions) - until Pages is
-# enabled there, `deploy-pages` has nothing to publish to regardless of
-# what triggers this file.
+# Fires automatically on a push to main that touches frontend/public/data/**
+# - the exact path frontend-export/export_gameweek.py writes to (its
+# OUTPUT_DIR) - so a new gameweek export goes live without a manual step.
+# workflow_dispatch stays available as a manual fallback (e.g. to redeploy
+# after a frontend source change with no new data). GitHub Pages must be
+# enabled for this repo (Settings -> Pages -> Source: GitHub Actions) for
+# `deploy-pages` to have anywhere to publish to - confirmed already enabled
+# here (build_type: workflow).
 name: Deploy frontend to GitHub Pages
 
 on:
+  push:
+    branches: [main]
+    paths: ["frontend/public/data/**"]
   workflow_dispatch: {}
 
 permissions:
