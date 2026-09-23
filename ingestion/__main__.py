@@ -1,8 +1,8 @@
 """CLI entrypoint: ``python -m ingestion backfill`` / ``python -m ingestion weekly``.
 
-This is the thing a Kubernetes CronJob actually execs (ARCHITECTURE.md
-section 8's ``ingestion`` Job) - a plain argparse CLI over the two functions
-in backfill.py/weekly.py, not a notebook or an interactive script, so
+This is the thing `docker compose run --rm ingestion <mode>` execs
+(ARCHITECTURE.md 8b) - a plain argparse CLI over the two functions in
+backfill.py/weekly.py, not a notebook or an interactive script, so
 containerizing it later is "point the container at this module", no rewrite.
 """
 

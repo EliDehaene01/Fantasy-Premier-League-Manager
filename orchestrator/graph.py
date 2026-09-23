@@ -3,13 +3,14 @@ note below) ingestion -> six specialist calls (genuinely parallel) -> the
 bounded reaction round -> Manager (aggregate, call solver, retry-on-
 infeasible, pick captain, narrate) -> a mode-dependent branch.
 
-**Scope note on "ingestion" as a graph step**: ARCHITECTURE.md 8 also lists
-`ingestion` as its own Kubernetes Job, separate from the `orchestrator`
-Deployment. Re-running the full bronze/silver/gold pipeline synchronously
-inside a graph node would duplicate that Job and reopen the no-lookahead
-data-slicing logic ingestion/ already owns and tests (CLAUDE.md's first
-hard constraint). This graph starts from an already-built ``player_pool``
-in the initial state - the ingestion Job's output for live mode, or the
+**Scope note on "ingestion" as a graph step**: ARCHITECTURE.md 8b also lists
+`ingestion` as its own Compose service (a one-shot CLI, separate from the
+`orchestrator` service). Re-running the full bronze/silver/gold pipeline
+synchronously inside a graph node would duplicate that step and reopen the
+no-lookahead data-slicing logic ingestion/ already owns and tests
+(CLAUDE.md's first hard constraint). This graph starts from an
+already-built ``player_pool`` in the initial state - ingestion's own
+output for live mode, or the
 backtest engine's own no-lookahead slice for backtest mode - rather than
 re-ingesting. ARCHITECTURE.md 6c's "ingestion" as the first step reads as
 "the graph's run begins once fresh data exists," not literally a node

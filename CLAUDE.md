@@ -4,7 +4,7 @@ Project memory for Claude Code. Keep this file short — see `README.md` for wha
 
 ## What this is
 
-Multi-agent system managing a real Fantasy Premier League squad. LangGraph orchestrates seven agents (six specialists + one manager), each its own containerized service, plus a React/GitHub Pages frontend that reads static exports. Two modes: backtest (historical, offline, auto-accepts proposals) and live weekly (real API, human-in-the-loop approval via the exported site).
+Multi-agent system managing a real Fantasy Premier League squad. LangGraph orchestrates seven agents (six specialists + one manager), each its own containerized service, plus a React/GitHub Pages frontend that reads static exports. Two modes: backtest (historical, offline, auto-accepts proposals) and live weekly (real API, human-in-the-loop approval via the exported site). Deployed locally with Docker Compose (`docker-compose.yml`) — Kubernetes was tried and abandoned; see ARCHITECTURE.md 8b.
 
 ## Hard constraints — do not violate
 
@@ -28,7 +28,6 @@ ingestion/          # data pulls: FPL API (live), GitHub archive (backtest)
 frontend-export/    # exports pending/final gameweek state as static JSON, commits to the frontend repo
 frontend/           # React app, deployed to GitHub Pages, reads only the exported static JSON
 shared/             # contracts.py (the shared agent response schema), agent_service.py (Foundry call + fallback + FastAPI scaffolding)
-k8s/                # manifests: namespace, CronJob, Deployments, ConfigMaps/Secrets -- local Docker Desktop Kubernetes, not cloud
 docs/               # dataset schemas, notebooks (EDA, model comparison, SHAP), design writeups
 ```
 
@@ -44,8 +43,7 @@ docs/               # dataset schemas, notebooks (EDA, model comparison, SHAP), 
 Fill in as they're established in Phase 0/1 — placeholders below, update once real:
 - Run backtest: `TBD`
 - Run tests: `TBD`
-- Local multi-service dev: `docker compose up`
-- Apply k8s manifests locally: `kubectl apply -f k8s/ --context kind-fpl-agents`
+- Local multi-service dev/deployment: `docker compose up -d` (all persistent services); `docker compose run --rm ingestion <mode>` for the one-shot ingestion CLI
 
 ## Current phase
 

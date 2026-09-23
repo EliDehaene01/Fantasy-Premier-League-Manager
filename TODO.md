@@ -11,7 +11,7 @@
 - [ ] Deploy the model(s) each agent will call (consider Foundry's Model Router for cost/quality balancing across the simpler specialist agents vs. the Manager's synthesis step); note endpoint + key
 - [ ] Enable Content Safety / Prompt Shields on the Foundry project (needed later in Phase 6, but easiest to turn on now alongside the rest of the resource setup)
 - [ ] Decide on and set up the shared data store (Postgres) for normalized data, LangGraph checkpoints, and transcripts
-- [ ] Local dev environment: Python env, Docker, a local Kubernetes cluster (kind or minikube) for testing manifests before any real cluster
+- [ ] Local dev environment: Python env, Docker, Docker Compose
 
 ## Phase 1 — Core agent logic
 
@@ -90,17 +90,16 @@
 
 ## Phase 4 — Containerization
 - [x] Write a Dockerfile per specialist service (stats, fixtures, news, contrarian, template, chips, manager, solver, ingestion, orchestrator) -- frontend-export deferred, see Phase 5a note below; it doesn't exist as code yet
-- [x] Local `docker compose` setup to verify the orchestrator can reach every specialist service before moving to Kubernetes -- verified for real (not just built): brought the stack up from a genuinely fresh Postgres twice, all 9 services reachable and DB-connected, orchestrator reaching every one over the compose network
+- [x] Local `docker compose` setup to verify the orchestrator can reach every specialist service -- verified for real (not just built): brought the stack up from a genuinely fresh Postgres twice, all 9 services reachable and DB-connected, orchestrator reaching every one over the compose network
 
-## Phase 5 — Kubernetes deployment
-- [x] Create the `fpl-agents` namespace and base manifests, on local Docker Desktop Kubernetes (not a cloud cluster -- deliberate cost/portfolio-value decision, see ARCHITECTURE.md 8b)
-- [x] Deploy the `orchestrator` (Deployment + Service) -- gave it an actual HTTP trigger surface (orchestrator/service.py: POST /run, POST /resume) since ARCHITECTURE.md 8 calls it a persistent Deployment, not a one-shot script
-- [x] Deploy each specialist service (Deployment or Job, depending on lifecycle) -- all 9 Deployments applied and verified Running (1/1) on the real local cluster; ingestion is a Job, not a Deployment
-- [x] Set up ConfigMaps/Secrets for Microsoft Foundry endpoint/keys and other config (k8s/configmap.yaml, k8s/secret.example.yaml -- real values stay local-only, gitignored)
-- [x] Decide and document whether Postgres runs inside the Kubernetes namespace or stays as the external local container already in use -- external, deliberately (k8s/postgres-external.yaml has the full reasoning); verified pods actually reach it via `host.docker.internal` (every DB-backed service showed `db_connected: true` from inside the cluster)
-- [x] Write the `deadline-checker` CronJob and the `ingestion` Job -- CronJob currently runs `ingestion weekly` unconditionally daily rather than the real "deadline within 24-36h" check, which isn't built yet; documented as an honest known gap in k8s/README.md, not hidden
-- [ ] Write the `frontend-export` Job: exports pending-approval and final-state JSON per gameweek, commits/pushes to the frontend repo -- blocked on Phase 5a existing first (this session's explicit dependency order: containerization -> Kubernetes -> frontend -> HITL)
-- [ ] Set up Windows Task Scheduler's "wake this computer" option so the local CronJob actually fires if the machine is asleep -- a one-time manual OS configuration step, not something this repo's code can do; left open, documented in k8s/README.md
+## Phase 5 — Local deployment (Docker Compose)
+Kubernetes was built and deployed successfully for several hours against real data first (namespace, CronJob, one Deployment per service, ConfigMaps/Secrets, a genuine live `/run`+`/resume` cycle against all six specialist services) -- then abandoned in favor of Docker Compose after a Docker Desktop kind-mode image-visibility limitation on the development machine (images built with `docker build` were never visible to the cluster's node, under any tag, or through a local registry) couldn't be resolved. See ARCHITECTURE.md 8b for the full record.
+
+- [x] `docker-compose.yml` defines all ten services (nine app containers + Postgres) with real env vars/ports/dependencies, matching what the (now-deleted) k8s manifests defined -- verified `docker compose up -d`: all nine app services healthy, every DB-backed one showing `db_connected: true` against the real, recovered Postgres data (not a fresh empty instance)
+- [x] `ingestion` modeled as a Compose "jobs"-profile service (`docker compose run --rm ingestion <mode>`), not a persistent one -- verified `auto` mode's real 24-36h deadline check inside the Compose network end to end
+- [x] Replace the CronJob-based weekly trigger with `scripts/weekly_pipeline.py` (`docker compose up -d` then `docker compose run --rm ingestion auto`) -- same deadline-aware logic as the CronJob, unchanged
+- [x] Point the existing Windows Task Scheduler "FPL pipeline wake" task (already configured, `WakeToRun`, daily) at the new script instead of its old start-Docker-Desktop-only action -- couldn't be applied directly (`Set-ScheduledTask` needs admin elevation this session didn't have); `scripts/update_wake_task.ps1` does it in one run as Administrator
+- [ ] Write the `frontend-export` step: exports pending-approval and final-state JSON per gameweek, commits/pushes to the frontend repo -- not yet wired into `scripts/weekly_pipeline.py`
 
 ## Phase 5a — Frontend
 - [x] Scaffold a React app (Vite + React, frontend/) -- NOT yet deployed to GitHub Pages (a one-way, publicly-visible action deliberately left for an explicit ask rather than assumed; base path is already configured and ready in vite.config.js)

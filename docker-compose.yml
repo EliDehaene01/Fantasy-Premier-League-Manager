@@ -1,29 +1,53 @@
-# Local multi-service dev stack (TODO.md Phase 4: "verify the orchestrator
-# can reach every specialist service before moving to Kubernetes"). All
-# *_DISABLE_LLM flags are set so this stack runs with zero real Foundry
-# calls/credentials - it verifies wiring and reachability, not model output
-# quality (that's what each agent's own test suite, and the backtest
-# engine's real-model run, already cover).
+# The sole local deployment mechanism (Kubernetes was tried, deployed
+# successfully for several hours, then abandoned - a Docker Desktop
+# kind-mode limitation on this machine meant images built here were never
+# visible to the cluster's node, with no available workaround; see
+# TODO.md's Phase 5 note). `docker compose up -d` brings up every
+# persistent service; `docker compose run --rm ingestion <mode>` runs the
+# one-shot ingestion CLI (it has no server, so it's excluded from `up -d`
+# via the "jobs" profile - see its own service entry below).
 #
-# frontend-export has no service here yet - it doesn't exist as code until
-# Phase 5a builds it (see CLAUDE.md's dependency order).
+# Postgres here IS the real database (not a throwaway dev-wiring copy):
+# `postgres_data` is an existing external volume already holding real
+# ingested season data - `docker compose up -d` reattaches it, it does not
+# create a fresh one. Every *_DISABLE_LLM flag below is "1" (no real
+# Foundry calls) except News, which has real Prompt Shields/Content Safety
+# credentials wired (see docs/foundry_guardrails.md) - the rest were never
+# exercised against real Foundry this session and stay mocked, matching
+# their prior state.
+
+volumes:
+  postgres_data:
+    external: true
+    name: 3ed8528dbb73f71f20f61e379b70a2c77d700159a6cc0ecc948269a2a93553c2
 
 services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_PASSWORD: MoveToLondon
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     ports:
-      # 5434, not 5433 - the local dev Postgres (fpl-postgres) already holds
-      # host:5433; compose services reach this one via the internal DNS name
-      # "postgres:5432" regardless, so this mapping is only for external
-      # debugging access and picking a free port avoids the clash.
-      - "5434:5432"
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: ingestion/Dockerfile
+    profiles: ["jobs"]  # a one-shot CLI, not a server - run with `docker compose run --rm ingestion <mode>`
+    environment:
+      DATABASE_URL: postgresql://postgres:MoveToLondon@postgres:5432/postgres
+      FPL_TEAM_ID: ${FPL_TEAM_ID}
+      ORCHESTRATOR_URL: http://orchestrator:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   solver:
     build:
@@ -64,7 +88,11 @@ services:
       dockerfile: agents/news/Dockerfile
     environment:
       DATABASE_URL: postgresql://postgres:MoveToLondon@postgres:5432/postgres
-      NEWS_AGENT_DISABLE_LLM: "1"
+      NEWS_AGENT_DISABLE_LLM: "0"
+      FPL_CONTENT_SAFETY_ENDPOINT: ${FPL_CONTENT_SAFETY_ENDPOINT}
+      FPL_CONTENT_SAFETY_KEY: ${FPL_CONTENT_SAFETY_KEY}
+      MICROSOFT_FOUNDRY_OPENAI_ENDPOINT: ${MICROSOFT_FOUNDRY_OPENAI_ENDPOINT}
+      MICROSOFT_FOUNDRY_KEY: ${MICROSOFT_FOUNDRY_KEY}
     depends_on:
       postgres:
         condition: service_healthy

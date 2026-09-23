@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
 
 
 def _health(app: FastAPI) -> dict:
-    """Liveness probe for Kubernetes; also confirms which model is loaded."""
+    """Health check; also confirms which model is loaded."""
     model: StatsModel = app.state.model
     return {"status": "ok", "model": model.model_name, "n_features": len(model.features)}
 

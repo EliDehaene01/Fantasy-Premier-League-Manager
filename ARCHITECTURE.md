@@ -7,7 +7,7 @@ The same agent logic runs in two contexts:
 | | Backtest | Live weekly |
 |---|---|---|
 | Data source | [vaastav/Fantasy-Premier-League](https://github.com/vaastav/Fantasy-Premier-League) GitHub archive — `merged_gws.csv` per season, genuinely gameweek-by-gameweek | Official FPL API, no auth required (current data) + live injury/team-news text |
-| Trigger | Manual / scripted loop over a full season | Kubernetes CronJob, ahead of each real deadline |
+| Trigger | Manual / scripted loop over a full season | Scheduled Docker Compose run, ahead of each real deadline |
 | Guardrails | Skipped or stubbed (no real external text, cost control) | Microsoft Foundry Content Safety / Prompt Shields on all model calls |
 | Output | Season totals, per-agent ablations, benchmark comparison | A recommendation sent for human approval (recommend-and-confirm) |
 | State | Simulated squad/bank/chips, checkpointed by LangGraph across the simulated season | Real squad/bank/chips, checkpointed by LangGraph across real weeks |
@@ -138,7 +138,7 @@ Three pieces work together here: the solver turns opinions into a legal squad, t
 - **Persistence**: a Postgres checkpointer saves graph state after every step, so a run resumes correctly without reconstructing history from scratch.
 - **Rejection/timeout**: logged as declined, no auto-retry or negotiation loop. A richer "reject with feedback, Manager reconsiders" flow is a legitimate future extension, not built now.
 
-Each specialist agent, though orchestrated by one LangGraph process, still runs as its own containerized service (see section 8) — a graph node calls out to that service over HTTP rather than running the agent's logic in-process.
+Each specialist agent, though orchestrated by one LangGraph process, still runs as its own containerized service (see section 8b) — a graph node calls out to that service over HTTP rather than running the agent's logic in-process.
 
 ## 7. Model hosting & guardrails: Microsoft Foundry
 
@@ -149,18 +149,7 @@ Each specialist agent, though orchestrated by one LangGraph process, still runs 
   - *User prompt attack detection* — guards any point where external/human input reaches an agent.
   - *Document attack detection* — screens the News agent's RAG-retrieved passages for indirect/embedded injection attempts before they reach the model's context. This is the most concretely useful guardrail in the whole system, precisely because the News agent is the one place ingesting uncontrolled external text.
 - **Groundedness detection** (optional, nice-to-have): checks that the News agent's summaries are actually supported by the retrieved text, rather than hallucinated.
-- Foundry is used here as the **model + safety layer**, not as the orchestration layer — LangGraph remains the state machine, Kubernetes remains the deployment substrate. This keeps the system from fighting three competing orchestration paradigms at once.
-
-## 8. Containerization & Kubernetes topology
-
-Namespace: `fpl-agents`. Runs on a **local Kubernetes cluster** (Docker Desktop's built-in Kubernetes), not a cloud cluster — a CronJob demonstrates the same orchestration skill whether it's running locally or in the cloud, and a cloud cluster would mean real ongoing cost for a project whose purpose is portfolio demonstration and managing one real team. See 8b for what running locally actually implies operationally.
-
-- **CronJob** (`deadline-checker`) — runs daily, checks the FPL fixtures endpoint for the next deadline; if it's within ~24-36 hours, triggers the pipeline Job. Avoids hardcoding a schedule around FPL's irregular deadline days.
-- **Job** (`ingestion`) — pulls and normalizes fresh data (FPL API + scraped news text), writes to Postgres (bronze/silver/gold, as in the model lifecycle section).
-- **Deployment** (`orchestrator`) — runs the LangGraph process and its Postgres checkpointer; calls out to each specialist service as a graph node.
-- **Deployments**, one per specialist service — `stats`, `fixtures`, `news`, `contrarian`, `template`, `chips`, `manager`, `solver` — each a small containerized service exposing one job.
-- **ConfigMaps/Secrets** — Microsoft Foundry endpoint and keys, model/classifier artifacts.
-- **Job** (`frontend-export`) — once the Manager's proposal is ready (or, later, once a gameweek's actual results land), exports the gameweek's data as a static JSON file and commits/pushes it to the frontend's repo, triggering a GitHub Pages rebuild (see 8a). This replaces a push-notification step entirely — there is no separate notifier service; the static site update *is* the mechanism, checked by pulling rather than being pushed to.
+- Foundry is used here as the **model + safety layer**, not as the orchestration layer — LangGraph remains the state machine, Docker Compose remains the deployment substrate. This keeps the system from fighting three competing orchestration paradigms at once.
 
 ## 8a. Frontend & GitHub Pages
 
@@ -169,10 +158,16 @@ Namespace: `fpl-agents`. Runs on a **local Kubernetes cluster** (Docker Desktop'
 - **Two data drops per gameweek**: once when the Manager's proposal is ready (pending-approval state: proposed squad, captain, chip call, full six-agent transcript including the reaction round), and again once real results land (final state: actual points scored, shown alongside what was proposed). These are two views of the same underlying gameweek record, not two different data models — the frontend renders whichever state the JSON says it's in.
 - **What's displayed per gameweek**: the chosen/proposed team, the full agent transcript (each specialist's first-round output plus the bounded reaction round), and — once played — the actual points the team received, shown against the backtest's benchmark (average manager score) for continuity with how the backtest engine already reports results.
 - **No auto-apply, no PR-based approval mechanism**: recommend-and-confirm stays exactly as originally scoped — the human reviews and applies changes manually in the real FPL app. The frontend is a record of what was proposed and what happened, not a control surface.
+- **Export trigger**: a `frontend-export` step (Python module, not yet wired into the weekly pipeline — see TODO.md) reads the paused-graph state or final results and writes the JSON described above, then commits/pushes it to the frontend's repo, triggering a GitHub Pages rebuild. This replaces a push-notification step entirely — there is no separate notifier service; the static site update *is* the mechanism, checked by pulling rather than being pushed to.
 
 ## 8b. Local deployment & scheduling
 
-- The CronJob runs on Docker Desktop's local Kubernetes
+Kubernetes was built and deployed here first (namespace, CronJob, one Deployment per service, ConfigMaps/Secrets) and ran successfully for several hours against real data before being abandoned: Docker Desktop's local Kubernetes runs in "kind" mode on this machine, and images built with `docker build` were never visible to the cluster's node under any tag or registry approach tried (direct image reference, unique tags, a local `registry:2` container proxied through Docker Desktop's own registry-mirror) — a real, investigated limitation, not a configuration mistake, with no available fix short of a different machine or a different Docker Desktop provisioning mode this installation doesn't expose. See TODO.md's Phase 5 note for the full record.
+
+**Docker Compose is the actual local deployment mechanism now** — genuinely multi-service and containerized (ten independent containers: nine specialist/orchestration services plus Postgres, each built from its own Dockerfile, each reachable over its own port), but *without* a cluster orchestrator: no scheduler placing pods across nodes, no self-healing restart-on-failure loop, no rolling-update strategy — `docker compose up -d` runs everything on one machine, restarted only if the machine restarts or the command is re-run. That's a real, accurate distinction from what Kubernetes would have demonstrated, not a difference to gloss over — Compose proves the services are genuinely separable and independently deployable; it doesn't prove they can be orchestrated at cluster scale.
+
+- **`docker-compose.yml`** defines all ten services: `postgres` (the real database — an existing external volume, not a fresh one, so `up -d` reattaches real data rather than creating an empty instance), `ingestion` (a one-shot CLI, excluded from `up -d` via a `jobs` Compose profile — invoked with `docker compose run --rm ingestion <mode>`), and one persistent service each for `orchestrator`, `manager`, `solver`, and the six specialists.
+- **Scheduling**: a Windows Task Scheduler task (`FPL pipeline wake`, `WakeToRun`, daily) wakes the machine and ensures Docker Desktop is running, then hands off to `scripts/weekly_pipeline.py`, which runs `docker compose up -d` followed by `docker compose run --rm ingestion auto`. `ingestion auto` (`ingestion/deadline.py`) keeps the same 24-36h deadline-aware check the CronJob used — most days this is one read-only FPL API call and exit; when a real deadline is close, it runs the weekly ingestion and then calls the orchestrator's real `POST /run` (`ingestion/trigger.py`) to kick off the pipeline. This is unchanged logic from the Kubernetes version, just invoked by a scheduled script instead of a CronJob-spawned pod.
 - No push notification (email/Slack) is sent — the weekly export to GitHub Pages is the entire signal; checking it before each deadline is on the human, by deliberate choice, not a gap in the system.
 
 ## 9. Backtest engine
