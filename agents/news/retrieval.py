@@ -17,12 +17,28 @@ from dataclasses import dataclass
 
 from . import embeddings
 
-# Two fixed reference queries, embedded once per call, that stand in for
-# "what is this tier actually looking for" - there's no free-text user
-# query here (retrieval is keyed by player_id, not a question), so
-# similarity ranks passages against a QUESTION appropriate to the job.
+# Two fixed reference queries that stand in for "what is this tier actually
+# looking for" - there's no free-text user query here (retrieval is keyed
+# by player_id, not a question), so similarity ranks passages against a
+# QUESTION appropriate to the job.
 AVAILABILITY_QUERY = "Is this player injured, suspended, or otherwise unavailable to play?"
 POSITIVE_COVERAGE_QUERY = "Is this player receiving notable positive attention, form, or praise?"
+
+# tier2.py calls retrieve_passages once PER PLAYER with one of exactly these
+# two fixed strings - without this cache, a full-pool scan (hundreds of
+# players) makes that many identical, real embedding API calls for a query
+# that never changes, which is what actually made a real 659-player
+# gameweek take minutes instead of seconds (found by running one through
+# the deployed cluster). The query text is fixed at import time, never
+# user-controlled, so caching every distinct value seen is safe for the
+# life of the process - there are only ever two.
+_query_embedding_cache: dict[str, list[float]] = {}
+
+
+def _embed_query(query_text: str) -> list[float]:
+    if query_text not in _query_embedding_cache:
+        _query_embedding_cache[query_text] = embeddings.embed_texts([query_text])[0]
+    return _query_embedding_cache[query_text]
 
 
 @dataclass
@@ -43,7 +59,7 @@ def retrieve_passages(
     availability query - the more common of the two callers).
     """
     query_text = query_text or AVAILABILITY_QUERY
-    query_vector = embeddings.embed_texts([query_text])[0]
+    query_vector = _embed_query(query_text)
 
     # `%s::vector` casts, not bare `%s`: the `<=>` operator only has an
     # overload for (vector, vector). A bound parameter with no cast resolves
