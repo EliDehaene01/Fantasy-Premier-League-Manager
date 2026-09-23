@@ -1,0 +1,141 @@
+{
+  "gameweek": 1,
+  "mode": "live",
+  "state": "final",
+  "source": "manual",
+  "approval_status": null,
+  "squad": [
+    {
+      "player_id": 412,
+      "starting": true,
+      "actual_points": 1,
+      "name": "Lammens",
+      "position": "GK",
+      "team": "Man Utd"
+    },
+    {
+      "player_id": 201,
+      "starting": true,
+      "actual_points": 0,
+      "name": "Mu\u00f1oz",
+      "position": "DEF",
+      "team": "Nott'm Forest"
+    },
+    {
+      "player_id": 498,
+      "starting": true,
+      "actual_points": 3,
+      "name": "Senesi",
+      "position": "DEF",
+      "team": "Spurs"
+    },
+    {
+      "player_id": 388,
+      "starting": true,
+      "actual_points": 10,
+      "name": "Gu\u00e9hi",
+      "position": "DEF",
+      "team": "Man City"
+    },
+    {
+      "player_id": 368,
+      "starting": true,
+      "actual_points": 8,
+      "name": "Szoboszlai",
+      "position": "MID",
+      "team": "Liverpool"
+    },
+    {
+      "player_id": 544,
+      "starting": true,
+      "actual_points": 9,
+      "name": "Xhaka",
+      "position": "MID",
+      "team": "Sunderland"
+    },
+    {
+      "player_id": 13,
+      "starting": true,
+      "actual_points": 3,
+      "name": "Rice",
+      "position": "MID",
+      "team": "Arsenal"
+    },
+    {
+      "player_id": 43,
+      "starting": true,
+      "actual_points": 2,
+      "name": "Tielemans",
+      "position": "MID",
+      "team": "Man Utd"
+    },
+    {
+      "player_id": 411,
+      "starting": true,
+      "actual_points": 2,
+      "name": "Haaland",
+      "position": "FWD",
+      "team": "Man City"
+    },
+    {
+      "player_id": 106,
+      "starting": true,
+      "actual_points": 0,
+      "name": "Thiago",
+      "position": "FWD",
+      "team": "Brentford"
+    },
+    {
+      "player_id": 552,
+      "starting": true,
+      "actual_points": 2,
+      "name": "Brobbey",
+      "position": "FWD",
+      "team": "Sunderland"
+    },
+    {
+      "player_id": 384,
+      "starting": false,
+      "actual_points": 3,
+      "name": "Donnarumma",
+      "position": "GK",
+      "team": "Man City"
+    },
+    {
+      "player_id": 499,
+      "starting": false,
+      "actual_points": 0,
+      "name": "Pedro Porro",
+      "position": "DEF",
+      "team": "Spurs"
+    },
+    {
+      "player_id": 17,
+      "starting": false,
+      "actual_points": 1,
+      "name": "Merino",
+      "position": "MID",
+      "team": "Arsenal"
+    },
+    {
+      "player_id": 112,
+      "starting": false,
+      "actual_points": 1,
+      "name": "Van Hecke",
+      "position": "DEF",
+      "team": "Spurs"
+    }
+  ],
+  "captain_id": 411,
+  "vice_captain_id": 13,
+  "chip": null,
+  "transfers_made": 0,
+  "hits_taken": 0,
+  "hit_points_cost": 0,
+  "narration": null,
+  "transcript": [],
+  "points": {
+    "gross": 42.0,
+    "net": 42.0
+  }
+}

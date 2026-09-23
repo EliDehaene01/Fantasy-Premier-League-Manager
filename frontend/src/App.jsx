@@ -84,7 +84,7 @@ export default function App() {
           {record && (
             <main className="record">
               <SquadView record={record} />
-              <Transcript transcript={record.transcript} />
+              <Transcript transcript={record.transcript} source={record.source} />
             </main>
           )}
         </>

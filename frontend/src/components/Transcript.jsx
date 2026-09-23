@@ -28,7 +28,14 @@ function RecommendationList({ title, items, kind }) {
   );
 }
 
-export default function Transcript({ transcript }) {
+export default function Transcript({ transcript, source }) {
+  if (source === "manual") {
+    return (
+      <section className="transcript manual-note">
+        <p>Your own selection — the multi-agent system wasn't active yet.</p>
+      </section>
+    );
+  }
   if (!transcript || transcript.length === 0) return null;
   return (
     <section className="transcript">
