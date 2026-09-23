@@ -30,6 +30,15 @@ MANAGER_URL_ENV = "MANAGER_URL"
 # a legal squad - the caller (this module) is responsible for asking for
 # enough coverage, per ArgueRequest's own top_k cap of 50.
 FULL_POOL_TOP_K = 50
+# News's Tier 2 (agents/news/tier2.py) does a real per-player RAG round trip
+# (embeddings + pgvector retrieval, and a classifier or LLM call) for every
+# unresolved availability case AND every player in the positive-coverage
+# scan - unlike the other five specialists, which score the whole pool in
+# one pass. 30s (fine for those) isn't enough once Tier 2 is actually doing
+# real network calls instead of failing fast on a config error - found by
+# running a real gameweek through the deployed cluster.
+SPECIALIST_TIMEOUT_SECONDS = {"news": 300.0}
+DEFAULT_TIMEOUT_SECONDS = 30.0
 
 
 def call_specialist(agent_name: str, gameweek: int, player_pool: list[dict]) -> AgentArgument:
@@ -39,7 +48,8 @@ def call_specialist(agent_name: str, gameweek: int, player_pool: list[dict]) -> 
         players=[PlayerEntry.model_validate(p) for p in player_pool],
         top_k=min(FULL_POOL_TOP_K, max(len(player_pool), 1)),
     )
-    resp = httpx.post(f"{base_url}/argue", json=request.model_dump(mode="json"), timeout=30.0)
+    timeout = SPECIALIST_TIMEOUT_SECONDS.get(agent_name, DEFAULT_TIMEOUT_SECONDS)
+    resp = httpx.post(f"{base_url}/argue", json=request.model_dump(mode="json"), timeout=timeout)
     resp.raise_for_status()
     return AgentArgument.model_validate(resp.json())
 
