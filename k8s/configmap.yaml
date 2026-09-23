@@ -16,6 +16,7 @@ data:
   TEMPLATE_AGENT_URL: "http://template:8000"
   CHIPS_AGENT_URL: "http://chips:8000"
   MANAGER_URL: "http://manager:8000"
+  ORCHESTRATOR_URL: "http://orchestrator:8000"
   # Docker Desktop's Kubernetes reaches the host machine via this special
   # DNS name - see postgres-external.yaml's own comment for why Postgres
   # stays external rather than running inside the cluster.

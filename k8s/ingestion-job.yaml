@@ -19,4 +19,5 @@ spec:
           imagePullPolicy: Never
           args: ["weekly"]
           envFrom:
-            - secretRef: { name: fpl-secrets }  # DATABASE_URL
+            - configMapRef: { name: fpl-config }
+            - secretRef: { name: fpl-secrets }  # DATABASE_URL, FPL_TEAM_ID

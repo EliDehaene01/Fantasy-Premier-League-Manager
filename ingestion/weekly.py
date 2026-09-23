@@ -67,10 +67,19 @@ def run_weekly(conn: "db.Connection", *, team_id: int | None = None) -> dict:
     silver.upsert_chip_usage(conn, history.get("chips", []))
 
     squad_ids: list[int] = []
+    bank = team_value = 0.0
     if state_gw is not None:
         picks = bronze.fetch_and_land_entry_picks(conn, team_id, state_gw)
         silver.upsert_my_team_state(conn, state_gw, entry, picks, transfers)
         squad_ids = [p["element"] for p in picks.get("picks", [])]
+        # Same entry_history fields silver.upsert_my_team_state itself reads
+        # for the my_team_state table - returned here too so a caller (the
+        # deadline-aware `auto` CLI mode, to trigger the orchestrator's real
+        # /run) doesn't need a second Postgres round trip just to re-read
+        # what this function already has in hand.
+        history = picks.get("entry_history", {})
+        bank = (history.get("bank") or 0) / 10.0
+        team_value = (history.get("value") or 0) / 10.0
 
     # Refine OUR squad's price/ownership/transfer-balance history via
     # element-summary - bounded to ~15 players, not the full pool (see
@@ -84,4 +93,8 @@ def run_weekly(conn: "db.Connection", *, team_id: int | None = None) -> dict:
         "player_gameweek_rows_written": rows_written,
         "my_team_state_gw": state_gw,
         "squad_size": len(squad_ids),
+        "bootstrap": bootstrap,
+        "squad_ids": set(squad_ids),
+        "bank": bank,
+        "team_value": team_value,
     }

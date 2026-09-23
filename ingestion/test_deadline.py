@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from ingestion.deadline import hours_until_next_deadline, should_trigger
+from ingestion.deadline import hours_until_next_deadline, next_gameweek_id, should_trigger
 
 NOW = datetime(2025, 9, 10, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -55,3 +55,13 @@ def test_no_op_at_end_of_season_with_no_upcoming_deadlines():
     bootstrap = _bootstrap(["2025-01-01T10:00:00Z"])  # only a past deadline
     assert hours_until_next_deadline(bootstrap, now=NOW) is None
     assert should_trigger(bootstrap, now=NOW) is False
+
+
+def test_next_gameweek_id_picks_the_soonest_upcoming_deadline_not_index_order():
+    bootstrap = _bootstrap(["2025-09-01T10:00:00Z", "2025-09-20T18:00:00Z", "2025-09-11T18:00:00Z"])
+    assert next_gameweek_id(bootstrap, now=NOW) == 3  # event id 3's deadline (index 2) is the soonest upcoming one
+
+
+def test_next_gameweek_id_is_none_with_no_upcoming_deadlines():
+    bootstrap = _bootstrap(["2025-01-01T10:00:00Z"])
+    assert next_gameweek_id(bootstrap, now=NOW) is None

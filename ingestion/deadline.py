@@ -30,3 +30,13 @@ def hours_until_next_deadline(bootstrap: dict, *, now: datetime | None = None) -
 def should_trigger(bootstrap: dict, *, window_hours: float = DEFAULT_WINDOW_HOURS, now: datetime | None = None) -> bool:
     hours = hours_until_next_deadline(bootstrap, now=now)
     return hours is not None and hours <= window_hours
+
+
+def next_gameweek_id(bootstrap: dict, *, now: datetime | None = None) -> int | None:
+    """The gameweek whose deadline is next up - what should_trigger's
+    window is measuring against, and the gameweek number ingestion/trigger.py
+    hands to the orchestrator's /run once it decides to trigger.
+    """
+    now = now or datetime.now(timezone.utc)
+    upcoming = [(d, e["id"]) for e in bootstrap["events"] if (d := _parse_deadline(e["deadline_time"])) > now]
+    return min(upcoming)[1] if upcoming else None

@@ -6,6 +6,10 @@
 # on every other day this exits after one cheap read-only API call, no DB
 # connection opened, no ingestion run. See ingestion/test_deadline.py for
 # the no-op-when-far-out behavior verified directly.
+#
+# On a trigger, `auto` also calls the orchestrator's real POST /run
+# (ingestion/trigger.py) once ingestion lands - needs configMapRef for
+# ORCHESTRATOR_URL, not just fpl-secrets for DATABASE_URL/FPL_TEAM_ID.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -25,4 +29,5 @@ spec:
               imagePullPolicy: Never
               args: ["auto"]
               envFrom:
+                - configMapRef: { name: fpl-config }
                 - secretRef: { name: fpl-secrets }
