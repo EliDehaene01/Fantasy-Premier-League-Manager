@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from shared.contracts import AgentArgument, VetoStatus
 
 from .config import AGENT_WEIGHTS, doubt_multiplier
+from .schemas import ManagerPlayerFact
 
 # The four agents whose `recommendations` are a normal, weighted vote - News
 # here means its `recommendations` half (notable positive coverage), never
@@ -32,18 +33,25 @@ class PlayerScore:
 def compute_adjusted_scores(
     stats: AgentArgument,
     adjustments: dict[str, AgentArgument],
+    player_pool: list[ManagerPlayerFact] | None = None,
 ) -> dict[int, PlayerScore]:
     """``adjustments`` is keyed by agent name - any subset of
     ``ADJUSTMENT_AGENTS`` may be present; a missing agent contributes zero
     adjustment to every player, per ARCHITECTURE.md 6b ("Missing opinions
     default to zero adjustment... not a crash or a worst-case assumption").
 
-    Only Stats' recommendations define the candidate player universe - it's
-    the only agent with a real `predicted_points` number
-    (ARCHITECTURE.md 6b: "Stats' predicted_points is the base currency"),
-    and it sits outside the weighted sum by design, not oversight. An
-    adjustment agent naming a player Stats didn't is a no-op for that
-    player - there's no base score to adjust.
+    Stats' recommendations set every SCORED player's base number - it's the
+    only agent with a real `predicted_points` (ARCHITECTURE.md 6b: "Stats'
+    predicted_points is the base currency"). But Stats' own `top_k` (sized
+    for the reaction-round transcript, which only wants a short list - see
+    orchestrator/callers.py) can genuinely omit real current-squad players
+    at live scale, and "the solver considered keeping the current squad" is
+    not optional the way "Stats had an opinion on every bench player" is -
+    a squad member Stats didn't score still gets a candidate-pool entry
+    here, scored 0.0 (last, not first, in the objective - just no longer
+    impossible to select). ``player_pool`` is optional and defaults to none
+    so every pre-existing caller (unit tests with no squad-retention
+    scenario in play) is unaffected.
     """
     scores: dict[int, PlayerScore] = {}
     for rec in stats.recommendations:
@@ -52,6 +60,10 @@ def compute_adjusted_scores(
         scores[rec.player_id] = PlayerScore(
             player_id=rec.player_id, predicted_points=rec.predicted_points, adjusted_score=rec.predicted_points
         )
+
+    for fact in player_pool or []:
+        if fact.in_current_squad and fact.player_id not in scores:
+            scores[fact.player_id] = PlayerScore(player_id=fact.player_id, predicted_points=0.0, adjusted_score=0.0)
 
     conviction_by_agent: dict[str, dict[int, float]] = {
         agent_name: (

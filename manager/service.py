@@ -60,7 +60,7 @@ def _summarize(gameweek: int, transfers_made: int, hits_taken: int, hit_points_c
 
 
 def manage(request: ManageRequest) -> ManageResult:
-    scores = compute_adjusted_scores(request.stats, request.adjustments)
+    scores = compute_adjusted_scores(request.stats, request.adjustments, request.player_pool)
     candidates = _build_candidates(scores, request.player_pool)
 
     solve_result = solve_squad(

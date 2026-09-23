@@ -95,6 +95,34 @@ def test_reproducible_same_inputs_produce_the_same_squad():
     assert first.model_dump(exclude={"narration"}) == second.model_dump(exclude={"narration"})
 
 
+def test_current_squad_is_always_a_representable_candidate_even_if_stats_top_k_omits_it():
+    """Real-world bug this reproduces: Stats' own top_k (sized for the
+    reaction-round transcript, not the solver - orchestrator/callers.py)
+    can genuinely omit real current-squad members at live scale, and
+    "keep the current squad" must still be feasible regardless. Without
+    manager/aggregation.py's fix, none of these 15 squad members would be
+    solver candidates at all (Stats scored 5 entirely different players),
+    so even the trivial zero-transfer solution would be unreachable and
+    the whole gameweek would come back "no valid plan found" - found by
+    running a real 659-player gameweek through the deployed cluster.
+    """
+    squad, pid, club = [], 1, 1
+    for position, count in [("GK", 2), ("DEF", 5), ("MID", 5), ("FWD", 3)]:
+        for _ in range(count):
+            squad.append(ManagerPlayerFact(player_id=pid, club_id=club, position=position, price=4.5, in_current_squad=True))
+            pid += 1
+            club += 1
+
+    other_recs = [Recommendation(player_id=100 + i, conviction=1.0, predicted_points=5.0) for i in range(5)]
+    stats = AgentArgument(agent="stats", recommendations=other_recs, reasoning="model output")
+
+    request = ManageRequest(gameweek=1, player_pool=squad, stats=stats)
+    result = manage(request)
+
+    assert result.feasible
+    assert len(result.squad) == 15
+
+
 def test_infeasible_plan_surfaces_a_message_not_a_degenerate_squad():
     request = ManageRequest(gameweek=1, player_pool=_pool(), stats=_stats(), budget=1.0)
     result = manage(request)
