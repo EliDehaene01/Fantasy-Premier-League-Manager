@@ -23,7 +23,7 @@ from orchestrator.graph import build_graph
 from orchestrator.run import run_backtest_gameweek
 
 from backtest.agents_bridge import SpecialistBridge, disable_all_llm_calls, log_predictions, write_team_state
-from backtest.engine import actual_points, build_player_pool, _latest_prices
+from backtest.engine import actual_points, build_player_pool
 from backtest.state import SeasonState
 
 

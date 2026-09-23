@@ -75,7 +75,7 @@
 - [x] Implement the walk-forward loop with strict no-lookahead data slicing
 - [x] Stub/skip guardrail calls during backtest (no real external text, avoid unnecessary cost) -- extended to all reasoning/narration LLM calls too (backtest/agents_bridge.py::disable_all_llm_calls), not just guardrails; only the deterministic scoring/solving logic runs for real
 - [x] Implement scoring against actual historical results, including transfer-hit and chip effects
-- [x] Implement benchmark comparisons -- "never transfer" baseline implemented for real; FPL average-manager score is honestly unavailable for a completed season (checked the actual archive file listing -- no such file; the live API only serves the currently active season), documented in backtest/benchmarks.py rather than faked
+- [x] Implement benchmark comparisons -- "never transfer" baseline implemented for real; FPL average-manager score is honestly unavailable (see docs/backtest_results.md for the verified reasoning, not repeated here)
 - [x] Implement per-agent ablation runs (backtest/engine.py::run_ablations)
 - [ ] Run a full-season backtest and write up results
 
@@ -93,7 +93,7 @@
 - [x] Local `docker compose` setup to verify the orchestrator can reach every specialist service -- verified for real (not just built): brought the stack up from a genuinely fresh Postgres twice, all 9 services reachable and DB-connected, orchestrator reaching every one over the compose network
 
 ## Phase 5 — Local deployment (Docker Compose)
-Kubernetes was built and deployed successfully for several hours against real data first (namespace, CronJob, one Deployment per service, ConfigMaps/Secrets, a genuine live `/run`+`/resume` cycle against all six specialist services) -- then abandoned in favor of Docker Compose after a Docker Desktop kind-mode image-visibility limitation on the development machine (images built with `docker build` were never visible to the cluster's node, under any tag, or through a local registry) couldn't be resolved. See ARCHITECTURE.md 8b for the full record.
+Kubernetes was built, deployed, and run successfully against real data first, then abandoned for Compose after a Docker Desktop kind-mode image-visibility limitation couldn't be resolved -- full account in ARCHITECTURE.md 8b, not repeated here.
 
 - [x] `docker-compose.yml` defines all ten services (nine app containers + Postgres) with real env vars/ports/dependencies, matching what the (now-deleted) k8s manifests defined -- verified `docker compose up -d`: all nine app services healthy, every DB-backed one showing `db_connected: true` against the real, recovered Postgres data (not a fresh empty instance)
 - [x] `ingestion` modeled as a Compose "jobs"-profile service (`docker compose run --rm ingestion <mode>`), not a persistent one -- verified `auto` mode's real 24-36h deadline check inside the Compose network end to end
@@ -103,7 +103,7 @@ Kubernetes was built and deployed successfully for several hours against real da
 
 ## Phase 5a — Frontend
 - [x] Scaffold a React app (Vite + React, frontend/) -- NOT yet deployed to GitHub Pages (a one-way, publicly-visible action deliberately left for an explicit ask rather than assumed; base path is already configured and ready in vite.config.js)
-- [x] Build the per-gameweek view: chosen/proposed team, full six-agent transcript (first round + bounded reaction round), actual points once played -- NOT shown against the backtest's average-manager benchmark, since that benchmark is honestly unavailable (checked the real archive/API, documented in backtest/benchmarks.py, not faked); shows the real per-player/captain-doubled points total instead
+- [x] Build the per-gameweek view: chosen/proposed team, full six-agent transcript (first round + bounded reaction round), actual points once played -- shows the real per-player/captain-doubled points total, not the average-manager benchmark (unavailable, see docs/backtest_results.md)
 - [x] Build the pending-vs-final state rendering (same underlying gameweek record, two states) -- verified in a real browser against two genuine gameweeks from the actual backtest pipeline (not fabricated fixture data), see frontend/public/data/gw9.json (final) and gw10.json (pending)
 - [x] Confirm the app only ever reads the exported static JSON -- no calls to Postgres or any backend, directly or indirectly -- verified by grepping frontend/src for every fetch()/XHR/axios call, not assumed: exactly two, both to static JSON under public/data/
 

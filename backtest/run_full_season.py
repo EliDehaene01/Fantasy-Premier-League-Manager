@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 from .benchmarks import never_transfer_total
-from .engine import DEFAULT_START_GW, run_ablations, run_season
+from .engine import DEFAULT_START_GW, run_season
 
 
 def main(season: str = "2025-26", start_gw: int = DEFAULT_START_GW, end_gw: int = 38) -> None:
