@@ -1,5 +1,5 @@
-"""ARCHITECTURE.md 10 / TODO.md Phase 7's "(Stretch) lightweight approve/
-reject action": a thin CLI wrapping orchestrator/service.py's POST /resume,
+"""ARCHITECTURE.md 10's lightweight approve/reject action: a thin CLI
+wrapping orchestrator/service.py's POST /resume,
 for whoever finds that more convenient than a raw curl command. Does
 nothing else - the actual interrupt/resume mechanism this calls is already
 built and tested (orchestrator/graph.py, orchestrator/service.py).

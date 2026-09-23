@@ -19,7 +19,7 @@ This is a project built to demonstrate practical skills with agentic AI framewor
 - Each specialist agent runs as its own containerized service, called from a LangGraph state machine that persists squad/bank/chip state across gameweeks and pauses for human approval before anything is finalized.
 - LLM calls are hosted through Microsoft Foundry (formerly Azure AI Foundry), with Prompt Shields guarding against both direct prompt injection and indirect/document-based injection — the latter is a real risk here, since the News agent ingests external news text.
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full breakdown of agents, data flow, and deployment topology, and [TODO.md](./TODO.md) for the build plan.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full breakdown of agents, data flow, and deployment topology.
 
 ## Why this project
 
@@ -103,17 +103,7 @@ Docker Compose deployment are built and verified — all ten services
 (six specialists, Manager, solver, orchestrator, Postgres) reach a
 genuinely healthy, DB-connected state from a real `docker compose up -d`,
 and the orchestrator's `/run` + `/resume` interrupt cycle has been run for
-real against live specialist services, not just unit tests. Kubernetes was
-also built and deployed successfully for several hours against real data,
-but was abandoned in favor of Compose after a Docker Desktop kind-mode
-image-visibility limitation on the development machine couldn't be
-resolved (see ARCHITECTURE.md 8b and TODO.md for the full record — kept
-as an honest account of what was tried, not erased). See [TODO.md](./TODO.md)
-for the authoritative, itemized checklist — remaining open items are
-mainly Microsoft Foundry guardrail wiring for the agents other than News
-(needs real Azure resources) and deriving the real free-transfer count
-from account data instead of a hardcoded default (currently verified
-correct by hand each week, not yet computed automatically).
+real against live specialist services, not just unit tests.
 
 ## License
 

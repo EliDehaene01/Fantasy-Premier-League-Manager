@@ -1,5 +1,5 @@
-"""TODO.md Phase 2's last item: run a full-season backtest and write up
-results. Not a test - a script, run once to produce the actual numbers for
+"""Runs a full-season backtest and writes up results. Not a test - a
+script, run once to produce the actual numbers for
 the portfolio writeup (ARCHITECTURE.md 9 step 3's "key artifact"). Prints a
 plain-text report; nothing here is asserted or checked, it's data
 collection.

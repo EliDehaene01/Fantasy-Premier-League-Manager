@@ -1,6 +1,6 @@
 """The weekly automated trigger, now that Kubernetes has been retired in
-favor of Docker Compose (see TODO.md's Phase 5 note - a CronJob doesn't
-exist without a cluster). Invoked by the "FPL pipeline wake" Windows Task
+favor of Docker Compose (see ARCHITECTURE.md 8b - a CronJob doesn't exist
+without a cluster). Invoked by the "FPL pipeline wake" Windows Task
 Scheduler task (WakeToRun, daily) once it's confirmed Docker Desktop is up;
 this script's own job starts there, not with waking the machine.
 

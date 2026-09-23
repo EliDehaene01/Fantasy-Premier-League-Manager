@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project memory for Claude Code. Keep this file short — see `README.md` for what this is, `ARCHITECTURE.md` for how it fits together, `TODO.md` for current build phase. Don't duplicate their content here; only what changes how you should work.
+Project memory for Claude Code. Keep this file short — see `README.md` for what this is, `ARCHITECTURE.md` for how it fits together. Don't duplicate their content here; only what changes how you should work.
 
 ## What this is
 
@@ -47,4 +47,4 @@ Fill in as they're established in Phase 0/1 — placeholders below, update once 
 
 ## Current phase
 
-See `TODO.md` for the authoritative checklist. Check it at the start of a session rather than assuming which phase is active.
+Live and tracking the real squad weekly (see README.md's Status section) — no separate phase checklist.

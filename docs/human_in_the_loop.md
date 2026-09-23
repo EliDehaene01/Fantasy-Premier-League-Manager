@@ -13,8 +13,8 @@ what a human actually does, gameweek to gameweek.
    aggregates and solves, and the mode branch pauses at `interrupt()` -
    ARCHITECTURE.md 6c's live-mode behavior, already tested
    (orchestrator/test_graph.py::test_live_mode_pauses_for_approval_then_resumes).
-3. The `frontend-export` Job (not yet built - see TODO.md's Phase 5 note)
-   would read that paused state and publish it as static JSON, the same
+3. The `frontend-export` step (not yet automatically invoked by the weekly
+   pipeline script) would read that paused state and publish it as static JSON, the same
    shape `frontend-export/export_gameweek.py` already produces and the
    frontend already renders (verified in a real browser - see the frontend
    commit). No push notification is sent; the human checks the site.

@@ -5,9 +5,9 @@ time" - it's what the weekly scheduled pipeline actually runs
 (ARCHITECTURE.md 8b; invoked via `docker compose run --rm ingestion weekly`
 or `auto`, see scripts/weekly_pipeline.py).
 
-Team id comes from the ``FPL_TEAM_ID`` environment variable (already found
-and stored per TODO.md's Phase 0 checklist), not a hardcoded default -
-nothing in this module should need editing to point at a different account.
+Team id comes from the ``FPL_TEAM_ID`` environment variable, not a
+hardcoded default - nothing in this module should need editing to point
+at a different account.
 """
 
 from __future__ import annotations

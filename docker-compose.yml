@@ -1,11 +1,8 @@
-# The sole local deployment mechanism (Kubernetes was tried, deployed
-# successfully for several hours, then abandoned - a Docker Desktop
-# kind-mode limitation on this machine meant images built here were never
-# visible to the cluster's node, with no available workaround; see
-# TODO.md's Phase 5 note). `docker compose up -d` brings up every
-# persistent service; `docker compose run --rm ingestion <mode>` runs the
-# one-shot ingestion CLI (it has no server, so it's excluded from `up -d`
-# via the "jobs" profile - see its own service entry below).
+# The sole local deployment mechanism (see ARCHITECTURE.md 8b for why, not
+# Kubernetes). `docker compose up -d` brings up every persistent service;
+# `docker compose run --rm ingestion <mode>` runs the one-shot ingestion
+# CLI (it has no server, so it's excluded from `up -d` via the "jobs"
+# profile - see its own service entry below).
 #
 # Postgres here IS the real database (not a throwaway dev-wiring copy):
 # `postgres_data` is an existing external volume already holding real

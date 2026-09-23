@@ -1,10 +1,11 @@
 """End-to-end tests for the orchestrator's graph (orchestrator/graph.py) -
 fan-out/fan-in wiring, the reaction round, Manager integration, and the
 mode branch (backtest auto-accept / live interrupt-and-resume). Fake
-callers stand in for the six live services and Manager's HTTP surface - the
-"dry run" TODO.md's Phase 3 calls for, not a live multi-service integration
-test (no Postgres, no running agent containers - Phase 4 hasn't happened
-yet). Manager's own aggregation/solve logic runs for real (imported
+callers stand in for the six live services and Manager's HTTP surface - a
+dry run of the graph's own wiring, not a live multi-service integration
+test (no Postgres, no running agent containers - see test_service.py and
+the real Compose deployment for that). Manager's own aggregation/solve
+logic runs for real (imported
 directly), so the News-veto-propagates test is a genuine end-to-end check,
 not a stub standing in for the decision itself.
 """

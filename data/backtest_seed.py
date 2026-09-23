@@ -46,8 +46,8 @@ ARCHIVE_BASE_URL = "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-Le
 
 def _cached_csv(season: str, filename: str) -> Path:
     """Downloads once, then reuses the local copy - same "fetch specific
-    files via raw.githubusercontent.com" approach TODO.md's Phase 0 already
-    established for ``merged_gws_<season>.csv``.
+    files via raw.githubusercontent.com" approach already established
+    elsewhere for ``merged_gws_<season>.csv``.
     """
     path = REPO_ROOT / f"{filename}_{season}.csv"
     if not path.exists():
