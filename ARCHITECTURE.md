@@ -172,7 +172,7 @@ Namespace: `fpl-agents`. Runs on a **local Kubernetes cluster** (Docker Desktop'
 
 ## 8b. Local deployment & scheduling
 
-- The CronJob runs on Docker Desktop's local Kubernetes, which means the machine needs to actually be on and awake at trigger time — not just a technicality, worth testing once rather than assumed. Windows Task Scheduler's "wake this computer to run this task" option handles this if the machine sleeps.
+- The CronJob runs on Docker Desktop's local Kubernetes
 - No push notification (email/Slack) is sent — the weekly export to GitHub Pages is the entire signal; checking it before each deadline is on the human, by deliberate choice, not a gap in the system.
 
 ## 9. Backtest engine
@@ -196,7 +196,7 @@ To avoid lookahead bias, the backtest walks forward strictly in time:
 3. The human reviews and applies the change manually in the real FPL team.
 4. No automatic write to the live FPL account happens in this version — applying changes to a real account requires FPL's unofficial, session-cookie-based API, which is out of scope until the recommendation quality is trusted.
 
-Auto-apply was scoped out deliberately (considered, including a PR-merge-triggered design) rather than left unconsidered — worth revisiting once the recommendation quality is trusted over a real stretch of gameweeks.
+Auto-apply was scoped out deliberately (considered, including a PR-merge-triggered design) rather than left unconsidered.
 
 ## 11. Observability
 
@@ -204,10 +204,3 @@ Auto-apply was scoped out deliberately (considered, including a PR-merge-trigger
 - Track backtest metrics (season totals, ablation results) somewhere queryable for the writeup.
 - Optionally use Microsoft Foundry's evaluation/observability dashboards to track agent output quality over time — another concretely enterprise-relevant tool to demonstrate.
 
-## 12. Future extensions
-
-- Auto-apply to the live FPL account once trust is established — a PR-based approval mechanism was designed and deliberately not built yet (GitHub Actions workflow triggered on merge, using FPL's unofficial session-based login, with a dry-run period before trusting a real submit). Revisit once the recommend-and-confirm loop has run reliably over real gameweeks.
-- A richer "reject with feedback, Manager reconsiders" flow, instead of a plain rejection/timeout being logged as declined.
-- A genuine multi-turn debate where agents can revise positions based on each other's arguments, rather than the current bounded, decision-inert reaction round — deliberately deferred since it would reopen the reproducibility guarantee the fixed-weight aggregation was built to protect.
-- Multi-league / mini-league-aware strategy (e.g. optimizing for rank within a specific mini-league rather than overall rank).
-- Richer chip strategy (e.g. reasoning jointly about wildcard timing and an upcoming double gameweek rather than treating them as separate decisions).
