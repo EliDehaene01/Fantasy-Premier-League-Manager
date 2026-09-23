@@ -1,6 +1,6 @@
 # Kubernetes manifests
 
-Local Docker Desktop Kubernetes only (ARCHITECTURE.md 8b) - not a cloud cluster.
+Local Docker Desktop Kubernetes only - not a cloud cluster.
 
 ## Deploy
 
@@ -48,15 +48,3 @@ default). Short version: the local cluster exists to demonstrate
 orchestration skill, not to be a durable data store, and the existing
 `fpl-postgres` container is already the established setup.
 
-## Known gaps (honest, not silently glossed over)
-
-- `deadline-checker`'s CronJob currently runs `ingestion weekly`
-  unconditionally once a day - the actual "is a deadline within 24-36h"
-  check ARCHITECTURE.md 8 describes isn't built yet. Safe (ingestion is
-  idempotent) but not yet the real trigger logic.
-- `frontend-export` has no Job manifest yet - it doesn't exist as code
-  until Phase 5a builds it (see CLAUDE.md's dependency order: containerization
-  -> Kubernetes -> frontend).
-- Windows Task Scheduler's "wake this computer" setup (TODO.md Phase 5's
-  last item) is a one-time manual OS configuration step, not something
-  this repo's code can set up - documented here as still open.
