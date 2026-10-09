@@ -1,0 +1,381 @@
+{
+  "gameweek": 6,
+  "mode": "live",
+  "state": "pending",
+  "approval_status": null,
+  "squad": [
+    {
+      "player_id": 384,
+      "starting": false,
+      "actual_points": null,
+      "name": "Donnarumma",
+      "position": "GK",
+      "team": "Man City"
+    },
+    {
+      "player_id": 161,
+      "starting": true,
+      "actual_points": null,
+      "name": "Lavia",
+      "position": "MID",
+      "team": "Chelsea"
+    },
+    {
+      "player_id": 388,
+      "starting": false,
+      "actual_points": null,
+      "name": "Gu\u00e9hi",
+      "position": "DEF",
+      "team": "Man City"
+    },
+    {
+      "player_id": 165,
+      "starting": true,
+      "actual_points": null,
+      "name": "Jo\u00e3o Pedro",
+      "position": "FWD",
+      "team": "Chelsea"
+    },
+    {
+      "player_id": 294,
+      "starting": true,
+      "actual_points": null,
+      "name": "Zambrano",
+      "position": "MID",
+      "team": "Hull City"
+    },
+    {
+      "player_id": 552,
+      "starting": true,
+      "actual_points": null,
+      "name": "Brobbey",
+      "position": "FWD",
+      "team": "Sunderland"
+    },
+    {
+      "player_id": 553,
+      "starting": true,
+      "actual_points": null,
+      "name": "Isidor",
+      "position": "FWD",
+      "team": "Sunderland"
+    },
+    {
+      "player_id": 8,
+      "starting": false,
+      "actual_points": null,
+      "name": "Calafiori",
+      "position": "DEF",
+      "team": "Arsenal"
+    },
+    {
+      "player_id": 43,
+      "starting": true,
+      "actual_points": null,
+      "name": "Tielemans",
+      "position": "MID",
+      "team": "Man Utd"
+    },
+    {
+      "player_id": 201,
+      "starting": true,
+      "actual_points": null,
+      "name": "Mu\u00f1oz",
+      "position": "DEF",
+      "team": "Nott'm Forest"
+    },
+    {
+      "player_id": 13,
+      "starting": false,
+      "actual_points": null,
+      "name": "Rice",
+      "position": "MID",
+      "team": "Arsenal"
+    },
+    {
+      "player_id": 368,
+      "starting": true,
+      "actual_points": null,
+      "name": "Szoboszlai",
+      "position": "MID",
+      "team": "Liverpool"
+    },
+    {
+      "player_id": 112,
+      "starting": true,
+      "actual_points": null,
+      "name": "Van Hecke",
+      "position": "DEF",
+      "team": "Spurs"
+    },
+    {
+      "player_id": 499,
+      "starting": true,
+      "actual_points": null,
+      "name": "Pedro Porro",
+      "position": "DEF",
+      "team": "Spurs"
+    },
+    {
+      "player_id": 412,
+      "starting": true,
+      "actual_points": null,
+      "name": "Lammens",
+      "position": "GK",
+      "team": "Man Utd"
+    }
+  ],
+  "captain_id": 553,
+  "vice_captain_id": 552,
+  "chip": null,
+  "transfers_made": 1,
+  "hits_taken": 0,
+  "hit_points_cost": 0.0,
+  "narration": "Gameweek 6: squad finalized with 1 transfer(s) and 0 hit(s) (0pt cost). Captain: player #553. Vice-captain: player #552.",
+  "transcript": [
+    {
+      "agent": "chips",
+      "recommendations": [],
+      "vetoes": [],
+      "chip_recommendation": {
+        "chip": null,
+        "confidence": 0.8,
+        "reasoning": "no fixture-calendar shape this gameweek justifies burning a scarce chip - hold for a better moment"
+      },
+      "reasoning": "No chip recommended this gameweek - no fixture-calendar shape this gameweek justifies burning a scarce chip - hold for a better moment.",
+      "reaction": "chips has nothing further to add."
+    },
+    {
+      "agent": "contrarian",
+      "recommendations": [
+        {
+          "player_id": 511,
+          "conviction": 1.0,
+          "predicted_points": 0.15,
+          "name": "Souza"
+        },
+        {
+          "player_id": 512,
+          "conviction": 1.0,
+          "predicted_points": 0.15,
+          "name": "Kudus"
+        },
+        {
+          "player_id": 513,
+          "conviction": 1.0,
+          "predicted_points": 0.15,
+          "name": "Xavi"
+        },
+        {
+          "player_id": 514,
+          "conviction": 1.0,
+          "predicted_points": 0.15,
+          "name": "Tel"
+        },
+        {
+          "player_id": 515,
+          "conviction": 1.0,
+          "predicted_points": 0.15,
+          "name": "Maddison"
+        }
+      ],
+      "vetoes": [],
+      "chip_recommendation": null,
+      "reasoning": "For GW6 the top differential is player 511 - predicted 0.1 pts this gameweek; owned by 0.0% of managers. Also worth a punt: player 512, player 513.",
+      "reaction": "contrarian has nothing further to add."
+    },
+    {
+      "agent": "fixtures",
+      "recommendations": [
+        {
+          "player_id": 250,
+          "conviction": 1.0,
+          "predicted_points": null,
+          "name": "Leno"
+        },
+        {
+          "player_id": 251,
+          "conviction": 1.0,
+          "predicted_points": null,
+          "name": "Lecomte"
+        },
+        {
+          "player_id": 252,
+          "conviction": 1.0,
+          "predicted_points": null,
+          "name": "McNally"
+        },
+        {
+          "player_id": 253,
+          "conviction": 1.0,
+          "predicted_points": null,
+          "name": "Andersen"
+        },
+        {
+          "player_id": 254,
+          "conviction": 1.0,
+          "predicted_points": null,
+          "name": "Robinson"
+        }
+      ],
+      "vetoes": [],
+      "chip_recommendation": null,
+      "reasoning": "For GW6 the fixture rule's top pick is player 250 - GW6: away, FDR 2. It also backs player 251, player 252 on similar fixture strength.",
+      "reaction": "fixtures has nothing further to add."
+    },
+    {
+      "agent": "news",
+      "recommendations": [
+        {
+          "player_id": 1,
+          "conviction": 0.72,
+          "predicted_points": null,
+          "name": "Raya"
+        },
+        {
+          "player_id": 12,
+          "conviction": 0.55,
+          "predicted_points": null,
+          "name": "Saka"
+        },
+        {
+          "player_id": 154,
+          "conviction": 0.6,
+          "predicted_points": null,
+          "name": "Palmer"
+        },
+        {
+          "player_id": 657,
+          "conviction": 0.7,
+          "predicted_points": null,
+          "name": "Nunes"
+        },
+        {
+          "player_id": 119,
+          "conviction": 0.4,
+          "predicted_points": null,
+          "name": "Costinha"
+        }
+      ],
+      "vetoes": [
+        {
+          "player_id": 1,
+          "status": "FIT",
+          "confidence": 1.0,
+          "grounding_snippet": null,
+          "name": "Raya"
+        },
+        {
+          "player_id": 2,
+          "status": "FIT",
+          "confidence": 1.0,
+          "grounding_snippet": null,
+          "name": "Arrizabalaga"
+        },
+        {
+          "player_id": 3,
+          "status": "FIT",
+          "confidence": 1.0,
+          "grounding_snippet": null,
+          "name": "Meslier"
+        },
+        {
+          "player_id": 4,
+          "status": "FIT",
+          "confidence": 1.0,
+          "grounding_snippet": null,
+          "name": "Gabriel"
+        },
+        {
+          "player_id": 5,
+          "status": "FIT",
+          "confidence": 1.0,
+          "grounding_snippet": null,
+          "name": "J.Timber"
+        }
+      ],
+      "chip_recommendation": null,
+      "reasoning": "Notable picks were identified only where the retrieved text includes unusually strong praise/clear role guidance. Player 1: the text explicitly endorses Arsenal\u2019s defensive core for clean-sheet upside, citing \u201cArsenal kept 19 clean sheets last season\u201d and a \u201cminimum 18 points between them\u201d while recommending Raya/Gabriel/Konsa as a set each week. Player 12: Saka is singled out for standout threat with specific chance/shot comparisons (\u201cthree big chances\u2026 more than the duo\u2019s combined one\u201d). Player 154: Palmer is backed with strong form/role emphasis, noting \u201cPalmer has been in excellent form\u201d and that he has \u201cthe edge\u201d because \u201cPalmer is on penalties\u201d. Player 657: Maresca\u2019s quote plus selection logic provides a strong start signal for Nico O\u2019Reilly availability and where he fits (\u201cconfirmed Nico O\u2019Reilly is \u2018100 per cent available\u2019\u2026 more likely to be at left-back\u201d). Player 119: Hurzeler\u2019s near-confirmed XI is implied (\u201ccould well stick with the same XI\u201d), with detailed contingent changes depending on fitness.",
+      "reaction": "news has nothing further to add."
+    },
+    {
+      "agent": "stats",
+      "recommendations": [
+        {
+          "player_id": 501,
+          "conviction": 1.0,
+          "predicted_points": 0.15,
+          "name": "Danso"
+        },
+        {
+          "player_id": 511,
+          "conviction": 1.0,
+          "predicted_points": 0.15,
+          "name": "Souza"
+        },
+        {
+          "player_id": 512,
+          "conviction": 1.0,
+          "predicted_points": 0.15,
+          "name": "Kudus"
+        },
+        {
+          "player_id": 513,
+          "conviction": 1.0,
+          "predicted_points": 0.15,
+          "name": "Xavi"
+        },
+        {
+          "player_id": 514,
+          "conviction": 1.0,
+          "predicted_points": 0.15,
+          "name": "Tel"
+        }
+      ],
+      "vetoes": [],
+      "chip_recommendation": null,
+      "reasoning": "For GW6 the model's top pick is player 501 (0.1 pts projected) - how much history we have on him is pushing the model toward him; though minutes over the last 3 gameweeks is a mild drag. It also backs player 511, player 512 on similar form and fixture signals.",
+      "reaction": "stats has nothing further to add."
+    },
+    {
+      "agent": "template",
+      "recommendations": [
+        {
+          "player_id": 8,
+          "conviction": 1.0,
+          "predicted_points": null,
+          "name": "Calafiori"
+        },
+        {
+          "player_id": 411,
+          "conviction": 0.996,
+          "predicted_points": null,
+          "name": "Haaland"
+        },
+        {
+          "player_id": 201,
+          "conviction": 0.948,
+          "predicted_points": null,
+          "name": "Mu\u00f1oz"
+        },
+        {
+          "player_id": 384,
+          "conviction": 0.936,
+          "predicted_points": null,
+          "name": "Donnarumma"
+        },
+        {
+          "player_id": 388,
+          "conviction": 0.935,
+          "predicted_points": null,
+          "name": "Gu\u00e9hi"
+        }
+      ],
+      "vetoes": [],
+      "chip_recommendation": null,
+      "reasoning": "For GW6 the safest template pick is player 8 - owned by 5451521.0% of managers; net transfers rising (+183297 this window). Also widely owned: player 411, player 201.",
+      "reaction": "template has nothing further to add."
+    }
+  ],
+  "points": null
+}
